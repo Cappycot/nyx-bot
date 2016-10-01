@@ -1,4 +1,4 @@
-# Requires colorama with init
+# Requires colorama with init if running in Windows.
 # What the fuck am I doing with my life?
 
 print("                 \033[37m=")
