@@ -88,5 +88,10 @@ ENV/
 # Rope project settings
 .ropeproject
 
-# AWS Key
+# Nyx Data
+info.nyx
+
+# AWS Items
 Nyx.pem
+*.sh
+
