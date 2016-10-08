@@ -8,13 +8,13 @@ import asyncio
 # from datetime import datetime
 import discord
 # from importlib import __import__, reload
-from nyxutils import binary_search
+from utilsnyx import binary_search
 import sys # exit, path.append
-# try:
-    # import colorama
-    # colorama.init()
-# except:
-    # print("Color init failed. Output may not display properly on Windows...")
+try: # Bypass ANSI escape sequences on output file.
+    import colorama
+    colorama.init()
+except:
+    print("Color init failed. Output may not display properly on Windows or output files...")
 
 
 ################################################################################
@@ -164,7 +164,10 @@ async def on_message_delete(message):
 #  - @Nyx ~help
 #  - @Nyx ~block @user
 #  - @Nyx ~unblock @user
+#  - @Nyx ~debug
+#  - @Nyx ~echo message...
 #  - @Nyx ~import module, module2...
+#                 list
 #  - @Nyx ~deport module, module2...
 #  - @Nyx ~deportall
 #  - @Nyx ~leave
