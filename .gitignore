@@ -90,8 +90,9 @@ ENV/
 
 # Nyx Data
 info.nyx
-users/
 modules/
+servers/
+users/
 
 # AWS Items
 Nyx.pem
