@@ -37,12 +37,12 @@ version = "0.0.1"
 # Server Package Setup
 ################################################################################
 
-class command:
+class Command:
     def __init__(self, function, *names):
         self.function = function
         self.names = names
         
-class module:
+class Module:
     def __init__(self, name, filepath, mod):
         self.filepath = filepath
         self.mod = mod
@@ -56,10 +56,14 @@ class module:
     def call_listener(self, name, *args):
         self.listeners[name](*args)
 
-class server:
+class Server:
     def __init__(self):
         self.prefixes = []
         self.modules = []
+        return
+
+class User:
+    def __init__(self):
         return
 
 
@@ -146,7 +150,7 @@ async def on_member_remove(member):
 
 # Primary module event.
 @client.event
-async def on_message_edit(message);
+async def on_message_edit(message):
     server = message.server
     return
 
@@ -166,6 +170,7 @@ async def on_message_delete(message):
 #  - @Nyx ~unblock @user
 #  - @Nyx ~debug
 #  - @Nyx ~echo message...
+#  - @Nyx ~exec
 #  - @Nyx ~import module, module2...
 #                 list
 #  - @Nyx ~deport module, module2...
@@ -188,7 +193,7 @@ print_line()
 import splash # Nyx art splash
 print_line()
 client.loop.create_task(clock())
-client.run(token)
+# client.run(token)
 
 
 
