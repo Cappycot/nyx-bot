@@ -89,12 +89,12 @@ ENV/
 .ropeproject
 
 # Nyx Data
-info.nyx
+*.nyx
 modules/
 servers/
 users/
 
 # AWS Items
-Nyx.pem
+*.pem
 *.sh
 

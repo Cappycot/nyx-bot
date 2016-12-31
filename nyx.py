@@ -38,7 +38,7 @@ import asyncio
 import discord
 # from importlib import __import__, reload
 from os import getcwd, listdir, mkdir
-from os.path import isfile
+from os.path import isfile, join
 from utilsnyx import binary_search
 import sys # exc_info, exit, path.append
 try: # Bypass ANSI escape sequences on output file.
@@ -70,12 +70,13 @@ def cmdcollision(module, *pmods):
     for pmod in pmods:
         if module == pmod:
             continue
-        if any(any(module.name == b for b in a.names) for a in pmod.commands):
+        if any(module.name in a.names for a in pmod.commands):
+        #if any(any(module.name == b for b in a.names) for a in pmod.commands):
             print("[WARN] Collision between module " + module.name + " and primary module " + pmod.name + "...")
             return True
     return False
-        
-    
+
+
 def is_server_admin(user, server):
     return server.default_channel.permissions_for(user).administrator
 
@@ -89,6 +90,12 @@ def loadstring(code):
 
 def print_line():
     print("--------------------------------------------------------------------------------")
+
+
+def trim(string):
+    while string[-1:] == "\r" or string[-1:] == "\n":
+        string = string[:-1].strip()
+    return string
 
 
 ################################################################################
@@ -108,6 +115,7 @@ class Module:
         self.commands = []
         self.dir = None
         self.disabled = False
+        self.folder = getcwd() + "/" + name + "/"
         self.module = module
         self.name = name
         self.names = [name]
@@ -131,15 +139,15 @@ class Module:
     def has_listener(self, name):
         return name in self.listeners
     def call_listener(self, name, **args):
-        self.listeners[name](**args)
+        return self.listeners[name](**args)
     
     def set_primary(self, primary):
         global primary_modules
-        exist = binary_search(primary_modules, self.name, lambda a: a.names[0])
+        exist = binary_search(primary_modules, self.name, lambda a: a.name)
         if primary and exist is None:
             global modules
             primary_modules.append(self)
-            primary_modules.sort(key = lambda a: a.names[0])
+            primary_modules.sort(key = lambda a: a.name)
             index = 0
             while index < len(modules):
                 if cmdcollision(modules[index], self):
@@ -165,7 +173,14 @@ class Server:
         self.prefixes = []
         
     def import_mod(self, module):
-        return
+        if module is None:
+            return False
+        for mod in modules:
+            for cmd in module.commands:
+                if any(cmd in a.names for a in mod.commands):
+                    return False
+        self.modules.append(module)
+        return True
     def deport_mod(self, module):
         if module in self.modules:
             self.modules.remove(module)
@@ -173,10 +188,11 @@ class Server:
         return False
     def deport(self, module):
         return self.deport_mod(module)
-    
-    def get_server():
+
+    def get_server(self):
         global client
-        
+        client.servers.sort(key = lambda a: a.id)
+        return binary_search(client.servers, self.id, lambda a: a.id)
 
 
 class User:
@@ -204,10 +220,11 @@ def load_module(name, path = None):
     """
     Loads a custom Nyx module into existence.
     """
+    global client
     module = binary_search(modules, name, lambda a: a.name)
     if module is None:
         for pmodule in primary_modules:
-            if any(name == a.names[0] for a in pmodule.commands):
+            if any(name in a.names for a in pmodule.commands):
                 return False
         try:
             if path is None:
@@ -243,6 +260,9 @@ def load_module(name, path = None):
 def load_modules():
     global mod_folder
     global modules
+    #global primary_modules
+    #modules = []
+    #primary_modules = []
     print("Loading modules...")
     folder = getcwd() + "/" + mod_folder + "/"
     for modpath in listdir(folder):
@@ -265,52 +285,252 @@ def unload_module(name):
 
 
 ################################################################################
+# Server Functions
+################################################################################
+
+def load_servers():
+    global server_folder
+    global servers
+    servers = []
+    print("Loading servers...")
+    folder = getcwd() + "/" + server_folder + "/"
+    for entry in listdir(folder):
+        data = join(folder, entry)
+        if isfile(data):
+            print(entry)
+            server = Server(entry)
+            data = open(data, "r")
+            for line in data:
+                line = trim(line)
+                names = line.split(":", 1)[1]
+                if len(names) < 2:
+                    continue
+                if line.startswith("modules:"):
+                    names = names.split("/")
+                    for name in names:
+                        module = binary_search(modules, name, lambda a: a.name)
+                        server.import_mod(module)
+                        #print(name)
+                        #print(module)
+                if line.startswith("prefixes:") or line.startswith("prefix:"):
+                    names = names.split(" ")
+                    for name in names:
+                        server.prefixes.append(name)
+                        #print(name)
+
+
+def save_server(server):
+    if server is None:
+        return False
+    try:
+        print("waifu idk placeholder text")
+        return True
+    except:
+        return False
+
+
+################################################################################
+# User Functions
+################################################################################
+
+def load_users():
+    global users
+    users = []
+    print("Loading users...")
+    folder = getcwd() + "/" + user_folder + "/"
+    for entry in listdir(folder):
+        path = join(folder, entry)
+        if isfile(path):
+            print(entry)
+            data = open(path, "r")
+            for line in data:
+                if line.startswith("privilege:"):
+                    try:
+                        privilege = int(line.split(":")[1])
+                        user = User(entry)
+                        user.privilege = privilege
+                        print(privilege)
+                        users.append(user)
+                    except:
+                        continue
+    users.sort(key = lambda a: a.id)
+
+
+def save_user(user):
+    if user is None:
+        return False
+    try:
+        print("waifu idk placeholder text")
+        return True
+    except:
+        return False
+
+
+################################################################################
 # Event Handling
 ################################################################################
 # The head module of a server configuration handles these events first.
 # Module Events:
-#  - help (message)
-#  - on_member_join (member)
-#  - on_member_remove (member)
-#  - on_message_edit (message)
-#  - on_message_delete (message)
+# 
 
 def trigger(module, name, **kwargs):
     if module.has_listener(name):
-        module.call_listener(name, **kwargs)
+        return module.call_listener(name, **kwargs)
+    return None
 
 
-# Primary module event.
 @client.event
-async def on_member_join(member):
-    server = member.server
+async def on_resumed():
     return
 
 
-# Primary module event.
 @client.event
-async def on_member_remove(member):
-    server = member.server
+async def on_error(event, *args, **kwargs):
     return
 
 
-# Primary module event.
-@client.event
-async def on_message_edit(message):
-    server = message.server
-    return
-
-
-# Primary module event.
 @client.event
 async def on_message_delete(message):
     server = message.server
     return
 
 
+@client.event
+async def on_message_edit(message1, message2):
+    server = message2.server
+    return
+
+
+@client.event
+async def on_reaction_add(reaction, user):
+    return
+
+
+@client.event
+async def on_reaction_remove(reaction, user):
+    return
+
+
+@client.event
+async def on_reaction_clear(message, reactions):
+    return
+
+
+@client.event
+async def on_channel_create(channel):
+    return
+
+
+@client.event
+async def on_channel_delete(channel):
+    return
+
+
+@client.event
+async def on_channel_update(channel1, channel2):
+    return
+
+
+@client.event
+async def on_member_join(member):
+    server = member.server
+    return
+
+
+@client.event
+async def on_member_remove(member):
+    server = member.server
+    return
+
+
+@client.event
+async def on_member_update(member1, member2):
+    return
+
+
+@client.event
+async def on_server_join(server):
+    return
+
+
+@client.event
+async def on_server_remove(server):
+    return
+
+
+@client.event
+async def on_server_update(server1, server2):
+    return
+
+
+@client.event
+async def on_server_role_create(role):
+    return
+
+
+@client.event
+async def on_server_role_delete(role):
+    return
+
+
+@client.event
+async def on_server_role_update(role1, role2):
+    return
+
+
+@client.event
+async def on_server_emojis_update(list1, list2):
+    return
+
+
+@client.event
+async def on_server_available(server):
+    return
+
+
+@client.event
+async def on_server_unavailable(server):
+    return
+
+@client.event
+async def on_voice_state_update(member1, member2):
+    return
+
+
+@client.event
+async def on_member_ban(member):
+    return
+
+
+@client.event
+async def on_member_unban(server, user):
+    return
+
+
+@client.event
+async def on_typing(channel, user, when):
+    return
+
+
+@client.event
+async def on_group_join(channel, user):
+    return
+
+
+@client.event
+async def on_group_remove(channel, user):
+    return
+
+
+################################################################################
+# Message Event Handler
+################################################################################
+
 # Check primary module event then command list.
 @client.event
 async def on_message(message):
+    if message.author.bot:
+        return
     server = message.server
     print(server)
     for module in primary_modules:
@@ -342,23 +562,27 @@ async def on_message(message):
         execute = None
         for module in primary_modules:
             for command in module.commands:
-                for name in command.names:
-                    if cmdtext.startswith(name.lower()):
-                        execute = command.function
-                        break
-                if execute:
-                    break
+                if any(cmdtext.startswith(a.lower()) for a in command.names):
+                    execute = command.function
+                    break;
             if execute:
                 break
         cmdtext = cmdtext.split(" ", 1)
         if execute is None and len(cmdtext):
             for module in modules:
                 if any(cmdtext[0].startswith(a) for a in module.names):
-                    print("module command?")
+                    for command in module.commands:
+                        if any(cmdtext[1].startswith(b) for b in command.names):
+                            execute = command.function
+                            break
+                if execute:
+                    message.content = cmdtext[1]
+                    break
         if execute:
-            execute(client = client, message = message)
+            output = execute(client = client, message = message)
+            if output:
+                await client.send_message(message.channel, output)
     print_line()
-    
 
 
 ################################################################################
@@ -404,6 +628,8 @@ def start():
     import splash # Nyx art splash
     print_line()
     load_modules()
+    load_servers()
+    load_users()
     print_line()
     client.loop.create_task(clock())
     client.run(token)
