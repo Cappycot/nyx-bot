@@ -1,7 +1,7 @@
 
 # Binary search with lambdas woo fucking hoo!
 def binary_search(array, query, key = lambda a: a):
-    if len(array) == 0:
+    if array is None or len(array) == 0:
         return None
     elif len(array) == 1:
         return key(array[0]) == query and array[0] or None
