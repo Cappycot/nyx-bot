@@ -17,7 +17,9 @@ def binary_search(array, query, key = lambda a: a):
 
 # Prints a list in legible format
 def list_string(alist, key = lambda a: a):
-    if len(alist) < 2:
+    if len(alist) == 0:
+        return "[empty]"
+    elif len(alist) < 2:
         return str(key(alist[0]))
     elif len(alist) == 2:
         return str(key(alist[0])) + " and " + str(key(alist[1]))
@@ -30,3 +32,13 @@ def list_string(alist, key = lambda a: a):
         else:
             result += str(key(item)) + ", "
     return result
+
+
+# Prunes Discord bots from a list of users
+def remove_bots(alist, key = lambda a: a):
+    i = 0
+    while i < len(alist):
+        if key(alist[i]).bot:
+            alist.remove(alist[i])
+        else:
+            i += 1

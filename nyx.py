@@ -354,6 +354,9 @@ def save_server(server):
 # User Functions
 ################################################################################
 
+def find_user(person):
+    return binary_search(users, person.id, lambda a: a.id)
+    
 def load_users():
     global users
     users = []
@@ -376,7 +379,6 @@ def load_users():
                         continue
     users.sort(key = lambda a: a.id)
 
-
 def save_user(user):
     if user is None:
         return False
@@ -390,6 +392,13 @@ def save_user(user):
     except:
         return False
 
+def add_user(person):
+    user = User(person.id)
+    users.append(user)
+    users.sort(key = lambda a: a.id)
+    save_user(user)
+    return user
+
 
 ################################################################################
 # Event Handling
@@ -399,8 +408,10 @@ def save_user(user):
 # 
 
 async def trigger(module, name, **kwargs):
-    if module.has_listener(name) and await module.call_listener(name, **kwargs):
+    if module.has_listener(name) and not await module.call_listener(name, **kwargs) is None:
+        print("module responded with halt")
         return True
+    print("module responded with None")
     return False
 
 
@@ -582,10 +593,14 @@ async def on_message(message):
     if server:
         print("Message from " + str(server) + " (" + server.id + ")...")
     responded = False
+    
+    print("Trigger primary modules")
     for module in primary_modules:
         responded = await trigger(module, "on_message", server = server, client = client, message = message)
+        
     if responded:
         return
+    print("Trigger server modules")
     if message.content and server:
         server = binary_search(servers, server.id, lambda a: a.id)
         if server:
