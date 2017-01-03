@@ -4,6 +4,9 @@
 # https://discordapp.com/oauth2/authorize?client_id=201425813965373440&scope=bot&permissions=0
 ################################################################################
 # Near Goals:
+# - Change savedata for servers and users to be single files with lots of lines
+#   rather than having lots of individual files. Like wow.
+# - Maybe move module importing/deporting code to a new primary module.
 # - 
 # Far Goals:
 # - Move main bot code to an object instance rather than within nyx.py itself.
@@ -16,7 +19,9 @@ command_prefixes = ["$", "~", "!", "#", "%", "-", ".", ">", "/"]
 debug = True
 mod_folder = "modules"
 server_folder = "servers"
+servers_file = "servers.nyx"
 user_folder = "users"
+users_file = "users.nyx"
 mod_prefix = "mod"  # Prefix and/or suffix should be used to distinguish names
 mod_suffix = ""     # from preexisting Python libraries...
 token = None
@@ -80,6 +85,10 @@ def cmdcollision(module, *pmods):
     return False
 
 
+def has_access(user, command):
+    return user.privilege < 0 or command.privilege >= 0 and user.privilege >= command.privilege
+
+
 def is_server_admin(user, server):
     return server.default_channel.permissions_for(user).administrator
 
@@ -110,6 +119,7 @@ class Command:
         self.desc = None
         self.function = function
         self.names = names
+        self.privilege = 1
         self.usage = None
 
 
@@ -324,6 +334,10 @@ def load_servers():
     servers.sort(key = lambda a: a.id)
 
 
+def save_servers():
+    return
+
+
 def save_server(server):
     if server is None:
         return False
@@ -354,9 +368,6 @@ def save_server(server):
 # User Functions
 ################################################################################
 
-def find_user(person):
-    return binary_search(users, person.id, lambda a: a.id)
-    
 def load_users():
     global users
     users = []
@@ -379,6 +390,7 @@ def load_users():
                         continue
     users.sort(key = lambda a: a.id)
 
+
 def save_user(user):
     if user is None:
         return False
@@ -392,12 +404,20 @@ def save_user(user):
     except:
         return False
 
+
+def save_users(user):
+    
+
 def add_user(person):
     user = User(person.id)
     users.append(user)
     users.sort(key = lambda a: a.id)
     save_user(user)
     return user
+
+
+def find_user(person):
+    return binary_search(users, person.id, lambda a: a.id)
 
 
 ################################################################################
@@ -409,9 +429,7 @@ def add_user(person):
 
 async def trigger(module, name, **kwargs):
     if module.has_listener(name) and not await module.call_listener(name, **kwargs) is None:
-        print("module responded with halt")
         return True
-    print("module responded with None")
     return False
 
 
@@ -592,15 +610,13 @@ async def on_message(message):
     server = message.server
     if server:
         print("Message from " + str(server) + " (" + server.id + ")...")
-    responded = False
     
-    print("Trigger primary modules")
+    responded = False
     for module in primary_modules:
         responded = await trigger(module, "on_message", server = server, client = client, message = message)
-        
     if responded:
         return
-    print("Trigger server modules")
+    
     if message.content and server:
         server = binary_search(servers, server.id, lambda a: a.id)
         if server:
@@ -610,29 +626,31 @@ async def on_message(message):
     if responded:
         return
     
-    
     # global mention
     server = message.server # temp fix
-    text = message.content
+    #text = message.content
     #mentioned = text.startswith(mention)
-    talk = server is None or text.startswith(mention)
-    if text.startswith(mention):
-        text = text[len(mention):].strip()
-    command = talk and any(text.startswith(a) for a in command_prefixes)
+    talk = server is None or message.content.startswith(mention)
+    if message.content.startswith(mention):
+        message.content = message.content[len(mention):].strip()
+    command = talk and any(message.content.startswith(a) for a in command_prefixes)
     
-    print(text)
+    print(message.content)
     #print("Is " + ("" if mentioned else "not ") + "a mention to Nyx.")
     print("Is " + ("" if talk else "not ") + "talking to Nyx.")
     print("Is " + ("" if command else "not ") + "a command for Nyx.")
+    user = find_user(message.author)
+    if user is None:
+        user = add_user(message.author)
     
     if command:
-        cmdtext = text[1:].lower() # Removes whatever command symbol the message started with.
+        cmdtext = message.content[1:].lower() # Removes whatever command symbol the message started with.
         print(cmdtext)
         execute = None
         for module in primary_modules:
             for command in module.commands:
                 if any(cmdtext.startswith(a.lower()) for a in command.names):
-                    execute = command.function
+                    execute = command
                     break;
             if execute:
                 break
@@ -642,14 +660,17 @@ async def on_message(message):
                 if any(cmdtext[0].startswith(a) for a in module.names):
                     for command in module.commands:
                         if any(cmdtext[1].startswith(b) for b in command.names):
-                            execute = command.function
+                            execute = command
                             break
                 if execute:
                     message.content = cmdtext[1]
                     break
         if execute:
-            print(execute)
-            output = execute(client = client, message = message)
+            output = None
+            if has_access(user, execute):
+                output = await execute.function(client = client, message = message)
+            elif user.privilege > 0:
+                output = "You do not have access to that command."
             if output:
                 await client.send_message(message.channel, output)
     print_line()
@@ -696,7 +717,6 @@ def on_ready():
     global mention
     mention = client.user.mention
     
-
 
 ################################################################################
 # Startup
