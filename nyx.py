@@ -3,7 +3,10 @@
 # 
 # https://discordapp.com/oauth2/authorize?client_id=201425813965373440&scope=bot&permissions=0
 ################################################################################
-
+# Near Goals:
+# - 
+# Far Goals:
+# - Move main bot code to an object instance rather than within nyx.py itself.
 
 ################################################################################
 # Main/Global Variables
@@ -81,7 +84,7 @@ def is_server_admin(user, server):
     return server.default_channel.permissions_for(user).administrator
 
 
-def loadstring(code):
+def loadstring(code, **kwargs):
     """
     Remote operate code from the Discord client...
     """
@@ -113,7 +116,7 @@ class Command:
 class Module:
     def __init__(self, name, module):
         self.commands = []
-        self.dir = None
+        #self.dir = None
         self.disabled = False
         self.folder = getcwd() + "/" + name + "/"
         self.module = module
@@ -138,8 +141,8 @@ class Module:
         self.listeners[name] = function
     def has_listener(self, name):
         return name in self.listeners
-    def call_listener(self, name, **args):
-        return self.listeners[name](**args)
+    async def call_listener(self, name, **kwargs):
+        return await self.listeners[name](**kwargs)
     
     def set_primary(self, primary):
         global primary_modules
@@ -177,7 +180,7 @@ class Server:
             return False
         for mod in modules:
             for cmd in module.commands:
-                if any(cmd in a.names for a in mod.commands):
+                if any(cmd in a.names for a in mod.commands) or cmd == mod.name:
                     return False
         self.modules.append(module)
         return True
@@ -317,13 +320,31 @@ def load_servers():
                     for name in names:
                         server.prefixes.append(name)
                         #print(name)
+            servers.append(server)
+    servers.sort(key = lambda a: a.id)
 
 
 def save_server(server):
     if server is None:
         return False
     try:
-        print("waifu idk placeholder text")
+        data = open(getcwd() + "/" + server_folder + "/" + server.id, "w")
+        # Module data...
+        if len(server.modules) > 0:
+            data.write("modules:")
+            data.write(server.modules[0].name)
+            for i in range(1, len(server.modules)):
+                data.write("/" + server.modules[i].name)
+            data.write("\n")
+        # Prefix data...
+        if len(server.prefixes) > 0:
+            data.write("prefixes:")
+            data.write(server.prefixes[0])
+            for i in range(1, len(server.prefixes)):
+                data.write(" " + server.prefixes[i])
+            data.write("\n")
+        data.flush()
+        data.close()
         return True
     except:
         return False
@@ -360,7 +381,11 @@ def save_user(user):
     if user is None:
         return False
     try:
-        print("waifu idk placeholder text")
+        data = open(getcwd() + "/" + user_folder + "/" + user.id, "w")
+        # check ur privilege
+        data.write("privilege:" + str(user.privilege) + "\n")
+        data.flush()
+        data.close()
         return True
     except:
         return False
@@ -373,153 +398,175 @@ def save_user(user):
 # Module Events:
 # 
 
-def trigger(module, name, **kwargs):
-    if module.has_listener(name):
-        return module.call_listener(name, **kwargs)
-    return None
+async def trigger(module, name, **kwargs):
+    if module.has_listener(name) and await module.call_listener(name, **kwargs):
+        return True
+    return False
+
+
+async def trigger_modules(name, server = None, **kwargs):
+    if server is None:
+        for module in primary_modules:
+            await trigger(module, name, client = client, server = server, **kwargs)
+    else:
+        imports = binary_search(servers, server.id, lambda a: a.id).modules
+        for module in modules:
+            if module in primary_modules or module in imports:
+                await trigger(module, name, client = client, server = server, **kwargs)
 
 
 @client.event
 async def on_resumed():
-    return
+    await trigger_modules("on_resumed", client = client)
 
 
 @client.event
 async def on_error(event, *args, **kwargs):
-    return
+    await trigger_modules("on_error", args = args, **kwargs)
 
 
 @client.event
 async def on_message_delete(message):
-    server = message.server
-    return
+    member = None if message.server is None else message.author
+    await trigger_modules("on_message_delete", message = message, server = message.server, channel = message.channel, user = message.author, member = member)
 
 
 @client.event
 async def on_message_edit(message1, message2):
-    server = message2.server
-    return
+    member = None if message2.server is None else message2.author
+    await trigger_modules("on_message_edit", message = [message1, message2], server = message2.server, channel = message2.channel, user = message2.author, member = member)
 
 
 @client.event
 async def on_reaction_add(reaction, user):
-    return
+    message = reaction.message
+    member = None if message.server is None else user
+    await trigger_modules("on_reaction_add", message = message, server = message.server, channel = message.channel, user = user, member = member, reaction = reaction, emoji = reaction.emoji)
 
 
 @client.event
 async def on_reaction_remove(reaction, user):
-    return
+    message = reaction.message
+    member = None if message.server is None else user
+    await trigger_modules("on_reaction_remove", message = message, server = message.server, channel = message.channel, user = user, member = member, reaction = reaction, emoji = reaction.emoji)
 
 
 @client.event
 async def on_reaction_clear(message, reactions):
-    return
+    message = reaction.message
+    await trigger_modules("on_reaction_remove", message = message, server = message.server, channel = message.channel, reactions = reactions)
 
 
 @client.event
 async def on_channel_create(channel):
-    return
+    await trigger_modules("on_channel_create", server = channel.server, channel = channel)
 
 
 @client.event
 async def on_channel_delete(channel):
-    return
+    await trigger_modules("on_channel_delete", server = channel.server, channel = channel)
 
 
 @client.event
 async def on_channel_update(channel1, channel2):
-    return
+    await trigger_modules("on_channel_delete", server = channel.server, channel = [channel1, channel2])
 
 
 @client.event
 async def on_member_join(member):
-    server = member.server
-    return
+    await trigger_modules("on_member_join", server = member.server, user = member, member = member)
 
 
 @client.event
 async def on_member_remove(member):
-    server = member.server
-    return
+    await trigger_modules("on_member_remove", server = member.server, user = member, member = member)
 
 
 @client.event
 async def on_member_update(member1, member2):
-    return
+    await trigger_modules("on_member_update", server = member.server, user = member, member = [member1, member2])
 
 
 @client.event
 async def on_server_join(server):
-    return
+    await trigger_modules("on_server_join", server = server)
 
 
 @client.event
 async def on_server_remove(server):
-    return
+    await trigger_modules("on_server_remove", server = server)
 
 
 @client.event
 async def on_server_update(server1, server2):
-    return
+    await trigger_modules("on_server_update", server = server2)
+    # TODO: Change kwargs possibly...
 
 
 @client.event
 async def on_server_role_create(role):
-    return
+    await trigger_modules("on_server_role_create", server = role.server, role = role)
 
 
 @client.event
 async def on_server_role_delete(role):
-    return
+    await trigger_modules("on_server_role_delete", server = role.server, role = role)
 
 
 @client.event
 async def on_server_role_update(role1, role2):
-    return
+    await trigger_modules("on_server_role_delete", server = role2.server, role = [role1, role2])
 
 
 @client.event
 async def on_server_emojis_update(list1, list2):
-    return
+    server = None
+    if len(list1) > 0:
+        server = list1[0].server
+    else: # TODO: Confirm the theory that either list has at least 1 emoji in it.
+        server = list2[0].server
+    await trigger_modules("on_server_emojis_update", server = server, emoji = [list1, list2])
 
 
 @client.event
 async def on_server_available(server):
-    return
+    await trigger_modules("on_server_available", server = server)
 
 
 @client.event
 async def on_server_unavailable(server):
-    return
+    await trigger_modules("on_server_unavailable", server = server)
+
 
 @client.event
 async def on_voice_state_update(member1, member2):
-    return
+    await trigger_modules("on_voice_state_update", server = member2.server, member = [member1, member2])
 
 
 @client.event
 async def on_member_ban(member):
-    return
+    await trigger_modules("on_member_ban", server = server, user = member, member = member)
 
 
 @client.event
 async def on_member_unban(server, user):
-    return
+    await trigger_modules("on_member_unban", server = server, user = user)
 
 
 @client.event
 async def on_typing(channel, user, when):
-    return
+    member = None if channel.server is None else user
+    await trigger_modules("on_typing", server = channel.server, channel = channel, user = user, member = member, time = when)
 
 
 @client.event
 async def on_group_join(channel, user):
-    return
+    await trigger_modules("on_group_join", channel = channel, user = user)
 
 
 @client.event
 async def on_group_remove(channel, user):
-    return
+    await trigger_modules("on_group_remove", channel = channel, user = user)
 
 
 ################################################################################
@@ -529,20 +576,26 @@ async def on_group_remove(channel, user):
 # Check primary module event then command list.
 @client.event
 async def on_message(message):
-    if message.author.bot:
+    if message.author.bot: # TODO: Remove this after testing...
         return
     server = message.server
-    print(server)
+    if server:
+        print("Message from " + str(server) + " (" + server.id + ")...")
+    responded = False
     for module in primary_modules:
-        trigger(module, "on_message", server = server, client = client, message = message)
+        responded = await trigger(module, "on_message", server = server, client = client, message = message)
+    if responded:
+        return
     if message.content and server:
         server = binary_search(servers, server.id, lambda a: a.id)
         if server:
             for module in modules:
-                if not module in primary_modules:
-                    trigger(module, "on_message", client = client, message = message)
-                if not message:
-                    return
+                if not module in primary_modules and module in server.modules:
+                    responded = await trigger(module, "on_message", client = client, message = message)
+    if responded:
+        return
+    
+    
     # global mention
     server = message.server # temp fix
     text = message.content
@@ -558,7 +611,8 @@ async def on_message(message):
     print("Is " + ("" if command else "not ") + "a command for Nyx.")
     
     if command:
-        cmdtext = text[1:].lower()
+        cmdtext = text[1:].lower() # Removes whatever command symbol the message started with.
+        print(cmdtext)
         execute = None
         for module in primary_modules:
             for command in module.commands:
@@ -579,6 +633,7 @@ async def on_message(message):
                     message.content = cmdtext[1]
                     break
         if execute:
+            print(execute)
             output = execute(client = client, message = message)
             if output:
                 await client.send_message(message.channel, output)
@@ -600,6 +655,15 @@ async def clock():
     print_line()
     while not shutdown:
         await asyncio.sleep(0.5)
+        
+    print("The system is going down now!")
+    await asyncio.sleep(1)
+    print("Logging out of Discord...")
+    await client.change_presence(game = discord.Game(name = "shutdown..."), status = discord.Status.idle)
+    await asyncio.sleep(1)
+    print("Here's your gold. Goodbye.")
+    print_line()
+    await client.logout()
 
 
 ################################################################################
