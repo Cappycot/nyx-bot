@@ -284,6 +284,7 @@ def load_modules():
         print(folder + mod_name)
         print("Module \"" + mod_name + "\" loaded " + ("successfully." if load_module(mod_name, folder + modpath) else "unsuccessfully."))
         print_line()
+    return True
 
 
 def unload_module(name):
@@ -326,6 +327,7 @@ def load_servers():
                 for name in names:
                     server.prefixes.append(name)
         servers.sort(key = lambda a: a.id)
+        print("Found data for " + str(len(servers)) + " server(s).")
         return True
     except:
         return False
@@ -386,6 +388,7 @@ def load_users():
             # TODO: Finalize this data loading...
             user.privilege = int(listing[1])
         users.sort(key = lambda a: a.id)
+        print("Found data for " + str(len(users)) + " user(s).")
         return True
     except:
         return False

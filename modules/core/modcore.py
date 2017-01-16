@@ -13,6 +13,16 @@ execute = None
 # Core Functions
 ################################################################################
 
+def get_privilege(person):
+    level = [1]
+    execute("""
+person = kwargs["person"]
+user = find_user(person)
+if not user is None:
+    kwargs["level"][0] = user.privilege
+    """, person = person, level = level)
+    return level[0]
+    
 def set_privilege(person, level):
     if level < 0:
         level = 1
@@ -24,7 +34,6 @@ if user is None:
 privilege = kwargs["args"][1]
 if user.privilege > 0 and privilege == 1 or user.privilege >= 0 and privilege != 1:
     user.privilege = privilege
-save_user(user)
     """, args = [person, level])
 
 
@@ -135,19 +144,10 @@ log = kwargs["log"]
 async def import_mod(message = None, **_):
     if message.server is None:
         return "This can't be done here!"
-    permission = message.author.server_permissions.administrator
-    if not permission:
-        permission = [message.author]
-        execute("""
-user = find_user(kwargs["result"][0])
-kwargs["result"][0] = False
-if user:
-    kwargs["result"][0] = user.privilege == -1
-""", result = permission)
-        permission = permission[0]
+    permission = message.author.server_permissions.manage_server or get_privilege(message.author) == -1
     if not permission:
         return "You do not have access to that command."
-    modules = message.content.split(" ")[1:]
+    modules = message.content.lower().split(" ")[1:]
     if len(modules) == 0:
         return "You didn't tell me what modules to import!"
     results = []
@@ -157,20 +157,52 @@ for name in kwargs["modules"]:
     module = get_module(name)
     if module and not module in server.modules and server.import_mod(module):
         kwargs["results"].append(name)
-save_server(server)
 """, modules = modules, results = results, server = message.server)
     if len(results) == 0:
         return "I couldn't import any of the modules!"
     return "Imported module(s) " + list_string(results) + "."
 
 
-async def deport():
-    
+async def deport(message = None, **_):
+    if message.server is None:
+        return "This can't be done here!"
+    permission = message.author.server_permissions.manage_server or get_privilege(message.author) == -1
+    if not permission:
+        return "You do not have access to that command."
+    modules = message.content.lower().split(" ")[1:]
+    if len(modules) == 0:
+        return "You didn't tell me what modules to deport!"
+    results = []
+    execute("""
+server = binary_search(servers, kwargs["server"].id, lambda a: a.id)
+for name in kwargs["modules"]:
+    module = get_module(name)
+    if module and module in server.modules and server.deport_mod(module):
+        kwargs["results"].append(name)
+""", modules = modules, results = results, server = message.server)
+    if len(results) == 0:
+        if "mexico" in modules:
+            return "I was not able to build a wall..."
+        return "I couldn't deport any of the modules!"
     return "Deported module(s) " + list_string(results) + "."
 
 
-async def deport_all():
-    return
+async def deport_all(message = None, **_):
+    if message.server is None:
+        return "This can't be done here!"
+    permission = message.author.server_permissions.manage_server or get_privilege(message.author) == -1
+    if not permission:
+        return "You do not have access to that command."
+    results = []
+    execute("""
+server = binary_search(servers, kwargs["server"].id, lambda a: a.id)
+for module in server.modules:
+    if server.deport_mod(module):
+        kwargs["results"].append(name)
+""", results = results, server = message.server)
+    if len(results) == 0:
+        return "There was nothing to deport!"
+    return "Deported module(s) " + list_string(results) + "."
 
 
 async def leave(client = None, message = None, **_):
@@ -241,6 +273,8 @@ commands = [[["help", "cmd", "command", "?"], help, "Display a list of commands.
             [["echo"], echo, "I does a copycat.", "echo <text>", -1],
             [["exec"], exec, "Remotely executes Python 3 code. Use log.append() instead of print().", "exec <code>", -1],
             [["import"], import_mod, "Imports a module into the designated server.", "import <module> [module2]", 1],
+            [["deportall"], deport_all, "Deports all modules from the designated server.", "deportall", 1],
+            [["deport"], deport, "Deports a module from the designated server.", "deport <module> [module2]", 1],
             [["leave", "die"], leave, "Leaves the designated server.", "leave", -1],
             [["op"], op, "Elevates (temporarily) a user or users to level 2 operator.", "op @user1 @user2...", -1],
             [["deop"], deop, "Revokes (temp?) a user or users to normal privileges.", "deop @user1 @user2...", -1],
