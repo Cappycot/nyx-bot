@@ -1,15 +1,15 @@
 ################################################################################
 # Nyx! A (Mostly Unison League themed) bot...
-# 
 # https://discordapp.com/oauth2/authorize?client_id=201425813965373440&scope=bot&permissions=0
 ################################################################################
 # Near Goals:
 # - Change savedata for servers and users to be single files with lots of lines
 #   rather than having lots of individual files. Like wow.
 # - Maybe move module importing/deporting code to a new primary module.
-# - 
+# - Remove list of primary_modules and just use a boolean to denote primary status.
 # Far Goals:
 # - Move main bot code to an object instance rather than within nyx.py itself.
+
 
 ################################################################################
 # Main/Global Variables
@@ -18,9 +18,7 @@
 command_prefixes = ["$", "~", "!", "#", "%", "-", ".", ">", "/"]
 debug = True
 mod_folder = "modules"
-server_folder = "servers"
 servers_file = "servers.nyx"
-user_folder = "users"
 users_file = "users.nyx"
 mod_prefix = "mod"  # Prefix and/or suffix should be used to distinguish names
 mod_suffix = ""     # from preexisting Python libraries...
@@ -42,13 +40,12 @@ version = "0.0.1"
 ################################################################################
 
 import asyncio
-# from datetime import datetime
+from datetime import datetime
 import discord
-# from importlib import __import__, reload
 from os import getcwd, listdir, mkdir
-from os.path import isfile, join
+from os.path import isfile
 from utilsnyx import binary_search
-import sys # exc_info, exit, path.append
+import sys
 try: # Bypass ANSI escape sequences on output file.
     import colorama
     colorama.init()
@@ -79,7 +76,6 @@ def cmdcollision(module, *pmods):
         if module == pmod:
             continue
         if any(module.name in a.names for a in pmod.commands):
-        #if any(any(module.name == b for b in a.names) for a in pmod.commands):
             print("[WARN] Collision between module " + module.name + " and primary module " + pmod.name + "...")
             return True
     return False
@@ -125,10 +121,10 @@ class Command:
 
 class Module:
     def __init__(self, name, module):
-        self.commands = []
-        #self.dir = None
+        self.commands = [] # list of Command objects this module has
+        # self.dir = None # removed in place of the folder variable
         self.disabled = False
-        self.folder = getcwd() + "/" + name + "/"
+        self.folder = getcwd() + "/" + mod_folder + "/" + name
         self.module = module
         self.name = name
         self.names = [name]
@@ -194,6 +190,7 @@ class Server:
                     return False
         self.modules.append(module)
         return True
+    
     def deport_mod(self, module):
         if module in self.modules:
             self.modules.remove(module)
@@ -210,6 +207,7 @@ class Server:
 
 class User:
     def __init__(self, id):
+        self.data = {"privilege": 1}
         self.id = id
         self.privilege = 1
         self.user = None
@@ -223,6 +221,7 @@ def get_module(name):
     to_return = binary_search(modules, name, lambda a: a.name)
     if not to_return is None:
         return to_return
+    # We start with O(log2n) then devolve to O(n^2) kek...
     for module in modules:
         if any(name == a for a in module.names):
             return module
@@ -301,62 +300,54 @@ def unload_module(name):
 # Server Functions
 ################################################################################
 
+def get_server(id):
+    return binary_search(servers, id, lambda a: a.id)
+
 def load_servers():
-    global server_folder
     global servers
-    servers = []
-    print("Loading servers...")
-    folder = getcwd() + "/" + server_folder + "/"
-    for entry in listdir(folder):
-        data = join(folder, entry)
-        if isfile(data):
-            print(entry)
-            server = Server(entry)
-            data = open(data, "r")
-            for line in data:
-                line = trim(line)
-                names = line.split(":", 1)[1]
-                if len(names) < 2:
-                    continue
-                if line.startswith("modules:"):
-                    names = names.split("/")
-                    for name in names:
-                        module = binary_search(modules, name, lambda a: a.name)
-                        server.import_mod(module)
-                        #print(name)
-                        #print(module)
-                if line.startswith("prefixes:") or line.startswith("prefix:"):
-                    names = names.split(" ")
-                    for name in names:
-                        server.prefixes.append(name)
-                        #print(name)
-            servers.append(server)
-    servers.sort(key = lambda a: a.id)
-
-
-def save_servers():
-    return
-
-
-def save_server(server):
-    if server is None:
-        return False
     try:
-        data = open(getcwd() + "/" + server_folder + "/" + server.id, "w")
-        # Module data...
-        if len(server.modules) > 0:
-            data.write("modules:")
-            data.write(server.modules[0].name)
-            for i in range(1, len(server.modules)):
-                data.write("/" + server.modules[i].name)
-            data.write("\n")
-        # Prefix data...
-        if len(server.prefixes) > 0:
-            data.write("prefixes:")
-            data.write(server.prefixes[0])
-            for i in range(1, len(server.prefixes)):
-                data.write(" " + server.prefixes[i])
-            data.write("\n")
+        data = open(servers_file, "r")
+        server = None
+        for line in data:
+            line = trim(line)
+            names = line.split(":", 1)[1]
+            if line.startswith("server:"):
+                server = get_server(names)
+                if server is None:
+                    server = Server(names)
+                    servers.append(server)
+            elif line.startswith("modules:"):
+                names = names.split("/")
+                for name in names:
+                    module = binary_search(modules, name, lambda a: a.name)
+                    server.import_mod(module)
+            elif line.startswith("prefixes:"):
+                names = names.split(" ")
+                for name in names:
+                    server.prefixes.append(name)
+        servers.sort(key = lambda a: a.id)
+        return True
+    except:
+        return False
+    
+def save_servers():
+    global servers
+    try:
+        data = open(servers_file, "w")
+        for server in servers:
+            data.write("server:" + server.id + "\n")
+            if len(server.modules) > 0:
+                data.write("modules:")
+                data.write(server.modules[0].name)
+                for i in range(1, len(server.modules)):
+                    data.write("/" + server.modules[i].name)
+                data.write("\n")
+            if len(server.prefixes) > 0:
+                data.write("prefixes:")
+                data.write(server.prefixes[0])
+                for i in range(1, len(server.prefixes)):
+                    data.write(" " + server.prefixes[i])
+                data.write("\n")
         data.flush()
         data.close()
         return True
@@ -368,36 +359,43 @@ def save_server(server):
 # User Functions
 ################################################################################
 
+def get_user(id):
+    user = binary_search(users, id, lambda a: a.id)
+    if user is None:
+        user = User(id)
+        users.append(user)
+        users.sort(key = lambda a: a.id)
+    return user
+
+# Deprecated...
+def find_user(person):
+    return get_user(person.id)
+
 def load_users():
     global users
-    users = []
-    print("Loading users...")
-    folder = getcwd() + "/" + user_folder + "/"
-    for entry in listdir(folder):
-        path = join(folder, entry)
-        if isfile(path):
-            print(entry)
-            data = open(path, "r")
-            for line in data:
-                if line.startswith("privilege:"):
-                    try:
-                        privilege = int(line.split(":")[1])
-                        user = User(entry)
-                        user.privilege = privilege
-                        print(privilege)
-                        users.append(user)
-                    except:
-                        continue
-    users.sort(key = lambda a: a.id)
-
-
-def save_user(user):
-    if user is None:
-        return False
     try:
-        data = open(getcwd() + "/" + user_folder + "/" + user.id, "w")
-        # check ur privilege
-        data.write("privilege:" + str(user.privilege) + "\n")
+        data = open(users_file, "r")
+        for line in data:
+            line = trim(line)
+            listing = line.split(":")
+            user = binary_search(users, listing[0], lambda a: a.id)
+            if user is None:
+                user = User(listing[0])
+                users.append(user)
+            user.data["privilege"] = int(listing[1])
+            # TODO: Finalize this data loading...
+            user.privilege = int(listing[1])
+        users.sort(key = lambda a: a.id)
+        return True
+    except:
+        return False
+
+def save_users():
+    print("Saving users...")
+    try:
+        data = open(users_file, "w")
+        for user in users:
+            data.write(user.id + ":" + user.privilege + "\n")
         data.flush()
         data.close()
         return True
@@ -405,27 +403,10 @@ def save_user(user):
         return False
 
 
-def save_users(user):
-    
-
-def add_user(person):
-    user = User(person.id)
-    users.append(user)
-    users.sort(key = lambda a: a.id)
-    save_user(user)
-    return user
-
-
-def find_user(person):
-    return binary_search(users, person.id, lambda a: a.id)
-
-
 ################################################################################
 # Event Handling
 ################################################################################
-# The head module of a server configuration handles these events first.
-# Module Events:
-# 
+
 
 async def trigger(module, name, **kwargs):
     if module.has_listener(name) and not await module.call_listener(name, **kwargs) is None:
@@ -605,11 +586,12 @@ async def on_group_remove(channel, user):
 # Check primary module event then command list.
 @client.event
 async def on_message(message):
-    if message.author.bot: # TODO: Remove this after testing...
-        return
     server = message.server
     if server:
         print("Message from " + str(server) + " (" + server.id + ")...")
+    print(message.content)
+    if message.author.bot: # TODO: Remove this after testing...
+        return
     
     responded = False
     for module in primary_modules:
@@ -635,7 +617,7 @@ async def on_message(message):
         message.content = message.content[len(mention):].strip()
     command = talk and any(message.content.startswith(a) for a in command_prefixes)
     
-    print(message.content)
+    
     #print("Is " + ("" if mentioned else "not ") + "a mention to Nyx.")
     print("Is " + ("" if talk else "not ") + "talking to Nyx.")
     print("Is " + ("" if command else "not ") + "a command for Nyx.")
@@ -677,20 +659,27 @@ async def on_message(message):
 
 
 ################################################################################
-# Background Clock
+# Main Background Clock
 ################################################################################
 # Run the clock function on each module.
 # Get a list of messages to send and forward all of those at once.
 
 @client.event
 async def clock():
-    print("Background clock created.")
+    print("Main background clock created.")
     await client.wait_until_ready()
     await client.change_presence(game = discord.Game(name = "code rewriting..."), status = discord.Status.dnd)
     print("Clock started.")
     print_line()
+    # TODO: Make this place neater...
+    
+    last_minute = -1 # Tick modules on main clock every minute.
     while not shutdown:
         await asyncio.sleep(0.5)
+        dtime = datetime.now()
+        if last_minute != dtime.minute:
+            last_minute = dtime.minute
+            await trigger_modules("clock", time = dtime)
         
     print("The system is going down now!")
     await asyncio.sleep(1)
@@ -726,9 +715,15 @@ def start():
     print_line()
     import splash # Nyx art splash
     print_line()
-    load_modules()
-    load_servers()
-    load_users()
+    if not load_modules():
+        print("[FATAL] Something failed while loading modules!")
+        sys.exit(0)
+    if not load_servers():
+        print("[FATAL] Something failed while loading servers!")
+        sys.exit(0)
+    if not load_users():
+        print("[FATAL] Something failed while loading users!")
+        sys.exit(0)
     print_line()
     client.loop.create_task(clock())
     client.run(token)
