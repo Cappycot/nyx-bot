@@ -43,8 +43,9 @@ def init(module = None, **_):
     if module is None:
         return False
     module.make_primary()
-    module.set_listener(on_message_delete, "on_message_delete")
-    module.set_listener(on_message_edit, "on_message_edit")
-    module.set_listener(on_reaction_add, "on_reaction_add")
+    #module.set_listener(on_message_delete, "on_message_delete")
+    #module.set_listener(on_message_edit, "on_message_edit")
+    #module.set_listener(on_reaction_add, "on_reaction_add")
     for lis in module.listeners:
         print(lis)
+    return True

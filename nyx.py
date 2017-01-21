@@ -15,7 +15,7 @@
 # Main/Global Variables
 ################################################################################
 
-command_prefixes = ["$", "~", "!", "#", "%", "-", ".", ">", "/"]
+command_prefixes = ["$", "~", "!", "%", "^", "&", "*", "-", "=", ".", ">", "/"]
 debug = True
 mod_folder = "modules"
 servers_file = "servers.nyx"
@@ -210,7 +210,6 @@ class User:
         self.data = {"privilege": 1}
         self.id = id
         self.privilege = 1
-        self.user = None
 
 
 ################################################################################
@@ -244,7 +243,8 @@ def load_module(name, path = None):
             sys.path.append(path)
             mod = __import__(mod_prefix + name + mod_suffix)
             module = Module(name, mod)
-            mod.init(module = module, loadstring = loadstring)
+            if not mod.init(module = module, loadstring = loadstring):
+                return False
             modules.append(module)
             modules.sort(key = lambda a: a.name)
             for cmd in module.commands:
@@ -302,7 +302,12 @@ def unload_module(name):
 ################################################################################
 
 def get_server(id):
-    return binary_search(servers, id, lambda a: a.id)
+    server = binary_search(servers, id, lambda a: a.id)
+    if server is None:
+        server = Server(id)
+        servers.append(server)
+        servers.sort(key = lambda a: a.id)
+    return server
 
 def load_servers():
     global servers
@@ -328,12 +333,14 @@ def load_servers():
                     server.prefixes.append(name)
         servers.sort(key = lambda a: a.id)
         print("Found data for " + str(len(servers)) + " server(s).")
+        data.close()
         return True
     except:
         return False
     
 def save_servers():
     global servers
+    print("Saving " + str(len(servers)) + " server(s)...")
     try:
         data = open(servers_file, "w")
         for server in servers:
@@ -389,20 +396,25 @@ def load_users():
             user.privilege = int(listing[1])
         users.sort(key = lambda a: a.id)
         print("Found data for " + str(len(users)) + " user(s).")
+        data.close()
         return True
     except:
         return False
 
 def save_users():
-    print("Saving users...")
+    global users
+    print("Saving " + str(len(users)) + " user(s)...")
     try:
         data = open(users_file, "w")
         for user in users:
-            data.write(user.id + ":" + user.privilege + "\n")
+            data.write(user.id + ":" + str(user.privilege) + "\n")
         data.flush()
         data.close()
         return True
     except:
+        ei = sys.exc_info()
+        for e in ei:
+            print(e)
         return False
 
 
@@ -589,12 +601,13 @@ async def on_group_remove(channel, user):
 # Check primary module event then command list.
 @client.event
 async def on_message(message):
-    server = message.server
-    if server:
-        print("Message from " + str(server) + " (" + server.id + ")...")
-    print(message.content)
-    if message.author.bot: # TODO: Remove this after testing...
+    if message.author.id == client.user.id:
         return
+    server = message.server
+    #if server:
+        #print("Message from " + str(server) + " (" + server.id + ")...")
+    #print(message.author)
+    #print(message.content)
     
     responded = False
     for module in primary_modules:
@@ -613,40 +626,56 @@ async def on_message(message):
     
     # global mention
     server = message.server # temp fix
-    #text = message.content
-    #mentioned = text.startswith(mention)
     talk = server is None or message.content.startswith(mention)
     if message.content.startswith(mention):
         message.content = message.content[len(mention):].strip()
     command = talk and any(message.content.startswith(a) for a in command_prefixes)
     
+    # TODO: Revise check for command
+    if not command and server:
+        server = get_server(server.id)
+        command = any(message.content.startswith(a) for a in server.prefixes)
     
-    #print("Is " + ("" if mentioned else "not ") + "a mention to Nyx.")
-    print("Is " + ("" if talk else "not ") + "talking to Nyx.")
-    print("Is " + ("" if command else "not ") + "a command for Nyx.")
+    
+    #print("Is " + ("" if talk else "not ") + "talking to Nyx.")
+    #print("Is " + ("" if command else "not ") + "a command for Nyx.")
     user = find_user(message.author)
     if user is None:
         user = add_user(message.author)
     
     if command:
         cmdtext = message.content[1:].lower() # Removes whatever command symbol the message started with.
-        print(cmdtext)
+        #print(cmdtext)
         execute = None
+        
+        # check primary modules
         for module in primary_modules:
             for command in module.commands:
                 if any(cmdtext.startswith(a.lower()) for a in command.names):
+                    #print("Found " + command.names[0])
                     execute = command
-                    break;
             if execute:
                 break
-        cmdtext = cmdtext.split(" ", 1)
+        
+        # check imported modules
+        if execute is None and server:
+            for module in server.modules:
+                for command in module.commands:
+                    if any(cmdtext.startswith(a.lower()) for a in command.names):
+                        #print("Found " + command.names[0])
+                        execute = command
+                if execute:
+                    break
+        
+        # check all modules
+        cmdtext = cmdtext.split(" ", 1) # [0] will be possible name of module
         if execute is None and len(cmdtext):
             for module in modules:
                 if any(cmdtext[0].startswith(a) for a in module.names):
                     for command in module.commands:
                         if any(cmdtext[1].startswith(b) for b in command.names):
+                            #print("Found " + command.names[0])
                             execute = command
-                            break
                 if execute:
                     message.content = cmdtext[1]
                     break
@@ -657,8 +686,9 @@ async def on_message(message):
             elif user.privilege > 0:
                 output = "You do not have access to that command."
             if output:
+                if server:
+                    output = message.author.mention + ", " + output
                 await client.send_message(message.channel, output)
-    print_line()
 
 
 ################################################################################
@@ -671,18 +701,27 @@ async def on_message(message):
 async def clock():
     print("Main background clock created.")
     await client.wait_until_ready()
-    await client.change_presence(game = discord.Game(name = "code rewriting..."), status = discord.Status.dnd)
+    statuschange = False
+    try:
+        await client.change_presence(game = discord.Game(name = "code rewriting..."), status = discord.Status.dnd)
+    except:
+        print("Status write failed...")
     print("Clock started.")
     print_line()
     # TODO: Make this place neater...
     
     last_minute = -1 # Tick modules on main clock every minute.
     while not shutdown:
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
         dtime = datetime.now()
         if last_minute != dtime.minute:
             last_minute = dtime.minute
+            print("minute tick")
             await trigger_modules("clock", time = dtime)
+            
+            if not statuschange:
+                await client.change_presence(game = discord.Game(name = "code rewriting..."), status = discord.Status.dnd)
+                statuschange = True
         
     print("The system is going down now!")
     await asyncio.sleep(1)
@@ -690,8 +729,12 @@ async def clock():
     await client.change_presence(game = discord.Game(name = "shutdown..."), status = discord.Status.idle)
     await asyncio.sleep(1)
     print("Here's your gold. Goodbye.")
-    print_line()
     await client.logout()
+    if not save_servers():
+        print("[FATAL] Something failed while saving servers!")
+    if not save_users():
+        print("[FATAL] Something failed while saving users!")
+    print_line()
 
 
 ################################################################################

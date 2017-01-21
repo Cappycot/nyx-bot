@@ -36,9 +36,9 @@ async def memetext(message = None, **_):
     message.content = message.content.split(" ", 1)[1]
     for ch in message.content.lower():
         if ch >= 'a' and ch <= 'z':
-            toreturn += ":regional_indicator_" + ch + ": "
+            toreturn += ":regional_indicator_" + ch + ":"
         elif ch >= '0' and ch <= '9':
-            toreturn += ":" + memenums[int(ch)] + ": "
+            toreturn += ":" + memenums[int(ch)] + ":"
         elif ch == " ":
             toreturn += "   "
         else:
@@ -65,4 +65,8 @@ commands = [[["bitch", "grey"], bitch],
 def init(module, **_):
     for cmd in commands:
         module.add_command(cmd[1], cmd[0])
+    return True
+
+
+
 
