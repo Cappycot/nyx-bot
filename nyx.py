@@ -42,6 +42,7 @@ version = "0.0.1"
 import asyncio
 from datetime import datetime
 import discord
+from importlib import reload
 from os import getcwd, listdir, mkdir
 from os.path import isfile
 from utilsnyx import binary_search
@@ -231,7 +232,6 @@ def load_module(name, path = None):
     """
     Loads a custom Nyx module into existence.
     """
-    global client
     module = binary_search(modules, name, lambda a: a.name)
     if module is None:
         for pmodule in primary_modules:
@@ -251,14 +251,23 @@ def load_module(name, path = None):
                 print(str(cmd.names) + " - " + str(cmd.function))
             return True
         except:
+            if module in primary_modules and not module in modules:
+                primary_modules.remove(module)
             error = sys.exc_info()
             for e in error:
                 print(e)
             return False
     elif debug:
         try:
-            module.__init__(module.name, reload(module.module))
+            print("Attempting reload.")
+            modules.remove(module)
+            if module in primary_modules: # TODO: Fix this crude stuff please...
+                primary_modules.remove(module)
+            module = Module(module.name, reload(module.module))
             module.module.init(module = module, loadstring = loadstring)
+            modules.append(module)
+            modules.sort(key = lambda a: a.name)
+            print("Reload successful?")
             return True
         except:
             error = sys.exc_info()

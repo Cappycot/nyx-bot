@@ -139,11 +139,11 @@ async def race(client = None, message = None, **_):
         while not race.is_finished():
             await asyncio.sleep(2)
             race.step()
-            await client.edit_message(racetrack, "The Great Emoji Race\n" + race.render())
+            await client.edit_message(racetrack, "Let the Great Emoji Race begin!\n" + race.render())
         await asyncio.sleep(2)
         winner = race.get_winner()
         et = discord.Embed(title = "The Great Emoji Race", description = winner.member.mention + " as " + winner.emoji + " has won the race!", color = discord.Color.green())
-        await client.edit_message(racetrack, race.render(), embed = et)
+        await client.edit_message(racetrack, "The Great Emoji Race has concluded!\n" + race.render(), embed = et)
     del races[message.server.id]
     
 

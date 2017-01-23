@@ -47,8 +47,6 @@ if user.privilege > 0 and privilege == 1 or user.privilege >= 0 and privilege !=
 #  - @Nyx $debug
 #  - @Nyx $echo message...
 #  - @Nyx $exec
-#  - @Nyx $load modulename
-#  - @Nyx $unload module
 #  - @Nyx $import module, module2...
 #                 list
 #  - @Nyx $deport module, module2...
@@ -59,7 +57,6 @@ if user.privilege > 0 and privilege == 1 or user.privilege >= 0 and privilege !=
 #  - @Nyx $op @user
 #  - @Nyx $deop @user
 #  - @Nyx $shutdown
-
 
 helpcode = """
 sym = command_prefixes[0]
@@ -334,6 +331,7 @@ async def test(message = None, **_):
         return emoji
     except:
         return "Failed!"
+
 
 commands = [[["help", "cmd", "command", "?"], help, "Display a list of commands.", "help", 1],
             [["block", "blacklist"], block, "Blacklists a user or users.", "block @user1 @user2...", -1],
