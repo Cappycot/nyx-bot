@@ -41,7 +41,6 @@ if user.privilege > 0 and privilege == 1 or user.privilege >= 0 and privilege !=
 # Command Functions
 ################################################################################
 # Root Server Commands:
-#  - @Nyx $help
 #  - @Nyx $block @user
 #  - @Nyx $unblock @user
 #  - @Nyx $debug
@@ -57,22 +56,6 @@ if user.privilege > 0 and privilege == 1 or user.privilege >= 0 and privilege !=
 #  - @Nyx $op @user
 #  - @Nyx $deop @user
 #  - @Nyx $shutdown
-
-helpcode = """
-sym = command_prefixes[0]
-for module in modules:
-""" + """
-    if module in primary_modules:
-        for command in module.commands:
-            print(sym + " " + command.names[0])
-    else:
-        print(module.name)
-"""
-
-async def help(**_):
-    print("----help----")
-    execute(helpcode)
-    print("----help----")
 
 
 async def debug(message = None, **_):
@@ -333,8 +316,7 @@ async def test(message = None, **_):
         return "Failed!"
 
 
-commands = [[["help", "cmd", "command", "?"], help, "Display a list of commands.", "help", 1],
-            [["block", "blacklist"], block, "Blacklists a user or users.", "block @user1 @user2...", -1],
+commands = [[["block", "blacklist"], block, "Blacklists a user or users.", "block @user1 @user2...", -1],
             [["unblock"], unblock, "Resets a user or users to normal privileges.", "unblock @user1 @user2...", -1],
             [["debug"], debug, "Turns debug mode on or off.", "debug", -1],
             [["echo"], echo, "I does a copycat.", "echo <text>", -1],

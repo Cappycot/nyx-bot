@@ -86,10 +86,6 @@ def has_access(user, command):
     return user.privilege < 0 or command.privilege >= 0 and user.privilege >= command.privilege
 
 
-def is_server_admin(user, server):
-    return server.default_channel.permissions_for(user).administrator
-
-
 def loadstring(code, **kwargs):
     """
     Remote operate code from the Discord client...
