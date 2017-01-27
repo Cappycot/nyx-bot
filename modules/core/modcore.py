@@ -46,6 +46,10 @@ if user.privilege > 0 and privilege == 1 or user.privilege >= 0 and privilege !=
 #  - @Nyx $debug
 #  - @Nyx $echo message...
 #  - @Nyx $exec
+#  - @Nyx $op @user
+#  - @Nyx $deop @user
+#  - @Nyx $shutdown
+
 #  - @Nyx $import module, module2...
 #                 list
 #  - @Nyx $deport module, module2...
@@ -53,9 +57,6 @@ if user.privilege > 0 and privilege == 1 or user.privilege >= 0 and privilege !=
 #  - @Nyx $prefix
 #  - @Nyx $prefixadd/prefixrem symbol1, symbol2...
 #  - @Nyx $leave
-#  - @Nyx $op @user
-#  - @Nyx $deop @user
-#  - @Nyx $shutdown
 
 
 async def debug(message = None, **_):

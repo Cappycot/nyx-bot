@@ -15,7 +15,8 @@ min_speed = 4
 push_threshold = 10
 races = {}
 display = ["one", "two", "three", "four", "five", "six", "seven", "eight"]
-place = [":trophy:", "``2nd``", "``3rd``", "``4th``", "``5th``", "``6th``", "``7th``", ":joy:"]
+lastplace = ":joy:"
+place = [":trophy:", "``2nd``", "``3rd``", "``4th``", "``5th``", "``6th``", "``7th``", lastplace]
 
 
 class Race:
@@ -46,7 +47,9 @@ class Race:
                 toreturn += "``" + ">" * int(racer.progress / 2) + "``"
             toreturn += racer.emoji
             if racer.place:
-                toreturn += place[racer.place - 1]
+                toreturn += lastplace if racer.place == len(self.racers) else place[racer.place - 1]
+            elif racer.progress > 0:
+                toreturn += "``" + str(racer.progress) + "%``"
             toreturn += "\n"
         toreturn += ":checkered_flag:``|------------------------------------------------|``:checkered_flag:"
         return toreturn

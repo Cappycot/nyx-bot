@@ -61,7 +61,7 @@ except:
 client = discord.Client()
 mention = None
 modules = []
-primary_modules = []
+primary_modules = [] # TODO: Get rid of this shitty list
 ready = False
 servers = []
 shutdown = False
