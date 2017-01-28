@@ -50,14 +50,6 @@ if user.privilege > 0 and privilege == 1 or user.privilege >= 0 and privilege !=
 #  - @Nyx $deop @user
 #  - @Nyx $shutdown
 
-#  - @Nyx $import module, module2...
-#                 list
-#  - @Nyx $deport module, module2...
-#  - @Nyx $deportall
-#  - @Nyx $prefix
-#  - @Nyx $prefixadd/prefixrem symbol1, symbol2...
-#  - @Nyx $leave
-
 
 async def debug(message = None, **_):
     result = []
@@ -162,135 +154,10 @@ log = kwargs["log"]
     return result
 
 
-################################################################################
-# Server Management Functions
-################################################################################
-
-async def import_mod(message = None, **_):
-    if message.server is None:
-        return "This can't be done here!"
-    permission = message.author.server_permissions.manage_server or get_privilege(message.author) == -1
-    if not permission:
-        return "You do not have access to that command."
-    modules = message.content.lower().split(" ")[1:]
-    if len(modules) == 0:
-        return "You didn't tell me what modules to import!"
-    results = []
-    execute("""
-server = binary_search(servers, kwargs["server"].id, lambda a: a.id)
-for name in kwargs["modules"]:
-    module = get_module(name)
-    if module and not module in server.modules and server.import_mod(module):
-        kwargs["results"].append(name)
-""", modules = modules, results = results, server = message.server)
-    if len(results) == 0:
-        return "I couldn't import any of the modules!"
-    return "Imported module(s) " + list_string(results) + "."
 
 
-async def deport(message = None, **_):
-    if message.server is None:
-        return "This can't be done here!"
-    permission = message.author.server_permissions.manage_server or get_privilege(message.author) == -1
-    if not permission:
-        return "You do not have access to that command."
-    modules = message.content.lower().split(" ")[1:]
-    if len(modules) == 0:
-        return "You didn't tell me what modules to deport!"
-    results = []
-    execute("""
-server = binary_search(servers, kwargs["server"].id, lambda a: a.id)
-for name in kwargs["modules"]:
-    module = get_module(name)
-    if module and module in server.modules and server.deport_mod(module):
-        kwargs["results"].append(name)
-""", modules = modules, results = results, server = message.server)
-    if len(results) == 0:
-        if "mexico" in modules:
-            return "I was not able to build a wall..."
-        return "I couldn't deport any of the modules!"
-    return "Deported module(s) " + list_string(results) + "."
 
 
-async def deport_all(message = None, **_):
-    if message.server is None:
-        return "This can't be done here!"
-    permission = message.author.server_permissions.manage_server or get_privilege(message.author) == -1
-    if not permission:
-        return "You do not have access to that command."
-    results = []
-    execute("""
-server = binary_search(servers, kwargs["server"].id, lambda a: a.id)
-for module in server.modules:
-    if server.deport_mod(module):
-        kwargs["results"].append(module.name)
-""", results = results, server = message.server)
-    if len(results) == 0:
-        return "There was nothing to deport!"
-    return "Deported module(s) " + list_string(results) + "."
-
-
-async def prefix(message = None, **_):
-    if message.server is None:
-        return "This can't be done here!"
-    results = []
-    execute("""
-server = get_server(kwargs["server"].id)
-kwargs["results"].extend(server.prefixes)
-""", results = results, server = message.server)
-    if len(results) == 0:
-        return "This server has no prefixes... Use \"@Mary $prefixadd <symbol>\" to add some."
-    return "Prefixes for this server are " + list_string(results, key = lambda a: "'" + a + "'")
-
-
-async def prefixadd(message = None, **_):
-    if message.server is None:
-        return "This can't be done here!"
-    if not (message.author.server_permissions.manage_server or get_privilege(message.author) == -1):
-        return "You do not have access to that command."
-    prefixes = message.content.lower().split(" ")[1:]
-    if len(prefixes) == 0:
-        return "You didn't tell me what prefixes to add!"
-    results = []
-    execute("""
-server = get_server(kwargs["server"].id)
-for prefix in kwargs["prefixes"]:
-    if prefix in command_prefixes and not prefix in server.prefixes:
-        server.prefixes.append(prefix)
-        kwargs["results"].append(prefix)
-""", prefixes = prefixes, results = results, server = message.server)
-    if len(results) == 0:
-        return "I couldn't add any of the prefixes! (Either invalid or added already.)"
-    return "Added prefix(es) " + list_string(results, key = lambda a: "'" + a + "'")
-
-
-async def prefixremove(message = None, **_):
-    if message.server is None:
-        return "This can't be done here!"
-    if not (message.author.server_permissions.manage_server or get_privilege(message.author) == -1):
-        return "You do not have access to that command."
-    prefixes = message.content.lower().split(" ")[1:]
-    if len(prefixes) == 0:
-        return "You didn't tell me what prefixes to remove!"
-    results = []
-    execute("""
-server = get_server(kwargs["server"].id)
-for prefix in kwargs["prefixes"]:
-    if prefix in server.prefixes:
-        server.prefixes.remove(prefix)
-        kwargs["results"].append(prefix)
-""", prefixes = prefixes, results = results, server = message.server)
-    if len(results) == 0:
-        return "I couldn't find such a prefix to remove!"
-    return "Removed prefix(es) " + list_string(results, key = lambda a: "'" + a + "'")
-
-
-async def leave(client = None, message = None, **_):
-    if message is None:
-        return
-    elif message.server is None:
-        return "I can't do that here!"
-    await client.leave_server(message.server)
 
 
 ################################################################################
@@ -322,13 +189,6 @@ commands = [[["block", "blacklist"], block, "Blacklists a user or users.", "bloc
             [["debug"], debug, "Turns debug mode on or off.", "debug", -1],
             [["echo"], echo, "I does a copycat.", "echo <text>", -1],
             [["exec"], exec, "Remotely executes Python 3 code. Use log.append() instead of print().", "exec <code>", -1],
-            [["import"], import_mod, "Imports a module into the designated server.", "import <module> [module2]", 1],
-            [["deportall"], deport_all, "Deports all modules from the designated server.", "deportall", 1],
-            [["deport"], deport, "Deports a module from the designated server.", "deport <module> [module2]", 1],
-            [["prefix"], prefix, "Gets a list of prefixes for the designated server.", "prefix", 1],
-            [["prefixadd", "addprefix"], prefixadd, "Adds a prefix to the designated server.", "prefixadd <symbol> [symbol2]", 1],
-            [["prefixrem", "removeprefix"], prefixremove, "Removes a prefix from the designated server.", "prefixrem <symbol> [symbol2]", 1],
-            [["leave", "die"], leave, "Leaves the designated server.", "leave", -1],
             [["op"], op, "Elevates (temporarily) a user or users to level 2 operator.", "op @user1 @user2...", -1],
             [["deop"], deop, "Revokes (temp?) a user or users to normal privileges.", "deop @user1 @user2...", -1],
             [["shutdown"], fullstop, "Kills me for good.", "shutdown", -1],

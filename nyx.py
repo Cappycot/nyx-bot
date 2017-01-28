@@ -3,8 +3,6 @@
 # https://discordapp.com/oauth2/authorize?client_id=201425813965373440&scope=bot&permissions=0
 ################################################################################
 # Near Goals:
-# - Change savedata for servers and users to be single files with lots of lines
-#   rather than having lots of individual files. Like wow.
 # - Maybe move module importing/deporting code to a new primary module.
 # - Remove list of primary_modules and just use a boolean to denote primary status.
 # Far Goals:
@@ -631,9 +629,11 @@ async def on_message(message):
     
     # global mention
     server = message.server # temp fix
-    talk = server is None or message.content.startswith(mention)
+    talk = server is None or message.content.startswith(mention) or message.content.startswith(nmention)
     if message.content.startswith(mention):
         message.content = message.content[len(mention):].strip()
+    elif message.content.startswith(nmention):
+        message.content = message.content[len(nmention):].strip()
     command = talk and any(message.content.startswith(a) for a in command_prefixes)
     
     # TODO: Revise check for command
@@ -684,6 +684,8 @@ async def on_message(message):
                 if execute:
                     message.content = cmdtext[1]
                     break
+        
+        # Run command.
         if execute:
             output = None
             if has_access(user, execute):
@@ -755,7 +757,9 @@ def on_ready():
     print_line()
     # Update user data.
     global mention
+    global nmention
     mention = client.user.mention
+    nmention = mention[0:2] + "!" + mention[2:]
     
 
 ################################################################################
@@ -764,7 +768,7 @@ def on_ready():
 
 def start():
     print_line()
-    import splash # Nyx art splash
+    import splashnyx # Nyx art splash
     print_line()
     if not load_modules():
         print("[FATAL] Something failed while loading modules!")

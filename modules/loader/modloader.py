@@ -41,7 +41,7 @@ async def unload(message = None, **_):
 
 #""", modules = modules, results = results)
     if len(results) == 0:
-        return "I couldn't load/reload any of the modules!"
+        return "I couldn't unload any of the modules!"
     return "I've unloaded " + list_string(results) + "."
 
 
