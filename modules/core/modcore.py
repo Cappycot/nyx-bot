@@ -63,7 +63,7 @@ kwargs["result"].append(str(debug).lower())
 
 async def fullstop(client = None, message = None, **_):
     if client and message:
-        await client.send_message(message.channel, "Goodbye...")
+        await client.send_message(message.channel, "Light cannot be without dark!!!")
     print("full stop")
     execute("""
 global shutdown
@@ -197,16 +197,6 @@ commands = [[["block", "blacklist"], block, "Blacklists a user or users.", "bloc
 
 
 ################################################################################
-# Event Functions
-################################################################################
-
-async def on_message(client = None, message = None, **_): # lmao at the "**_" part
-    if client is None or message is None:
-        return
-    print("Message from " + str(message.author.id) + ": " + message.content)
-
-
-################################################################################
 # Module Functions
 ################################################################################
 
@@ -220,7 +210,6 @@ def init(module = None, loadstring = None, **_):
         command.desc = cmd[2]
         command.usage = cmd[3]
         command.privilege = cmd[4]
-    module.set_listener(on_message, "on_message")
     module.make_primary()
     return True
 

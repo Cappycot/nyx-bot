@@ -3,7 +3,6 @@
 # https://discordapp.com/oauth2/authorize?client_id=201425813965373440&scope=bot&permissions=0
 ################################################################################
 # Near Goals:
-# - Maybe move module importing/deporting code to a new primary module.
 # - Remove list of primary_modules and just use a boolean to denote primary status.
 # Far Goals:
 # - Move main bot code to an object instance rather than within nyx.py itself.
@@ -425,8 +424,9 @@ def save_users():
 # Event Handling
 ################################################################################
 
-
-async def trigger(module, name, **kwargs):
+async def trigger(module, name, client = None, **kwargs):
+    if client:
+        await client.wait_until_ready()
     if module.has_listener(name) and not await module.call_listener(name, **kwargs) is None:
         return True
     return False
@@ -434,7 +434,7 @@ async def trigger(module, name, **kwargs):
 
 async def trigger_modules(name, server = None, **kwargs):
     if server is None:
-        for module in primary_modules:
+        for module in modules:
             await trigger(module, name, client = client, server = server, **kwargs)
     else:
         imports = binary_search(servers, server.id, lambda a: a.id).modules
@@ -445,7 +445,7 @@ async def trigger_modules(name, server = None, **kwargs):
 
 @client.event
 async def on_resumed():
-    await trigger_modules("on_resumed", client = client)
+    await trigger_modules("on_resumed")
 
 
 @client.event

@@ -4,10 +4,23 @@
 
 import asyncio
 
+
+################################################################################
+# Command Functions
+################################################################################
+
 async def sample(client = None, message = None, **_):
     return "Sample text."
 
 commands = [[["sample"], sample, "Sample text.", "sample", 1]]
+
+
+################################################################################
+# Event Functions
+################################################################################
+
+async def clock(client = None, time = None, **_):
+    pass
 
 
 ################################################################################
@@ -22,6 +35,7 @@ def init(module = None, loadstring = None, **_):
         command.desc = cmd[2]
         command.usage = cmd[3]
         command.privilege = cmd[4]
+    module.set_listener(clock, "clock")
     return True
 
 

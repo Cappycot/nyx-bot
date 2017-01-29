@@ -112,7 +112,7 @@ for module in server.modules:
     return "Deported module(s) " + list_string(results) + "."
 
 
-async def prefix(message = None, **_):
+async def prefix(client = None, message = None, **_):
     if message.server is None:
         return "This can't be done here!"
     results = []
@@ -120,8 +120,10 @@ async def prefix(message = None, **_):
 server = get_server(kwargs["server"].id)
 kwargs["results"].extend(server.prefixes)
 """, results = results, server = message.server)
-    if len(results) == 0:
-        return "This server has no prefixes... Use \"@Mary $prefixadd <symbol>\" to add some."
+    if len(results) == 0 and client:
+        return "This server has no prefixes... Use \"@" + client.user.name + " $prefixadd <symbol>\" to add some."
+    elif len(results) == 0:
+        return "This server has no prefixes..."
     return "Prefixes for this server are " + list_string(results, key = lambda a: "'" + a + "'")
 
 
@@ -189,8 +191,10 @@ commands = [[["import"], import_mod, "Imports a module into the current server."
 ################################################################################
 
 def init(module = None, loadstring = None, **_):
-    if module is None:
+    if module is None or loadstring is None:
         return False
+    global execute
+    execute = loadstring
     for cmd in commands:
         command = module.add_command(cmd[1], cmd[0])
         command.desc = cmd[2]
