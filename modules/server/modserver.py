@@ -121,7 +121,7 @@ server = get_server(kwargs["server"].id)
 kwargs["results"].extend(server.prefixes)
 """, results = results, server = message.server)
     if len(results) == 0 and client:
-        return "This server has no prefixes... Use \"@" + client.user.name + " $prefixadd <symbol>\" to add some."
+        return "This server has no prefixes... Use \"" + client.user.mention + " $prefixadd <symbol>\" to add some."
     elif len(results) == 0:
         return "This server has no prefixes..."
     return "Prefixes for this server are " + list_string(results, key = lambda a: "'" + a + "'")

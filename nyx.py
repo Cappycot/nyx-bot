@@ -29,7 +29,7 @@ try:
                 token = token[:-1]
 except:
     print("[FATAL] Unable to find or read token in info file.")
-version = "0.0.1"
+version = "0.0.2"
 
 
 ################################################################################
@@ -108,6 +108,7 @@ class Command:
     def __init__(self, function, names, **args):
         self.desc = None
         self.function = function
+        self.name = names[0]
         self.names = names
         self.privilege = 1
         self.usage = None
@@ -424,10 +425,10 @@ def save_users():
 # Event Handling
 ################################################################################
 
-async def trigger(module, name, client = None, **kwargs):
+async def trigger(module, name, **kwargs):
     if client:
         await client.wait_until_ready()
-    if module.has_listener(name) and not await module.call_listener(name, **kwargs) is None:
+    if module.has_listener(name) and not await module.call_listener(name, client = client, **kwargs) is None:
         return True
     return False
 
@@ -435,12 +436,12 @@ async def trigger(module, name, client = None, **kwargs):
 async def trigger_modules(name, server = None, **kwargs):
     if server is None:
         for module in modules:
-            await trigger(module, name, client = client, server = server, **kwargs)
+            await trigger(module, name, server = server, **kwargs)
     else:
         imports = binary_search(servers, server.id, lambda a: a.id).modules
         for module in modules:
             if module in primary_modules or module in imports:
-                await trigger(module, name, client = client, server = server, **kwargs)
+                await trigger(module, name, server = server, **kwargs)
 
 
 @client.event
@@ -614,7 +615,7 @@ async def on_message(message):
     
     responded = False
     for module in primary_modules:
-        responded = await trigger(module, "on_message", server = server, client = client, message = message)
+        responded = await trigger(module, "on_message", server = server, message = message)
     if responded:
         return
     
@@ -623,7 +624,7 @@ async def on_message(message):
         if server:
             for module in modules:
                 if not module in primary_modules and module in server.modules:
-                    responded = await trigger(module, "on_message", client = client, message = message)
+                    responded = await trigger(module, "on_message", message = message)
     if responded:
         return
     
@@ -682,7 +683,7 @@ async def on_message(message):
                             #print("Found " + command.names[0])
                             execute = command
                 if execute:
-                    message.content = cmdtext[1]
+                    message.content = message.content.split(" ", 1)[1]
                     break
         
         # Run command.
@@ -723,7 +724,7 @@ async def clock():
         dtime = datetime.now()
         if last_minute != dtime.minute:
             last_minute = dtime.minute
-            print("minute tick")
+            #print("minute tick")
             await trigger_modules("clock", time = dtime)
             
             if not statuschange:

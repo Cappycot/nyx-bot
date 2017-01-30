@@ -16,7 +16,6 @@ execute = None
 
 
 async def load(message = None, **_):
-    print("load")
     modules = message.content.lower().split(" ")[1:]
     if len(modules) == 0:
         return "You didn't tell me what modules to load/reload!"
