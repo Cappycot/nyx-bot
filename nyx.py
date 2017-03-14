@@ -2,6 +2,9 @@
 # Nyx! A (Mostly Unison League themed) bot...
 # https://discordapp.com/oauth2/authorize?client_id=201425813965373440&scope=bot&permissions=0
 ################################################################################
+# Current Task:
+# - Rewriting framework to have client as an object
+#   rather than a set of global variables.
 # Near Goals:
 # - Remove list of primary_modules and just use a boolean to denote primary status.
 # Far Goals:
@@ -49,55 +52,6 @@ try: # Bypass ANSI escape sequences on output file.
     colorama.init()
 except:
     print("[WARN] Color init failed. Output may not display properly on Windows or output files...")
-    
-    
-################################################################################
-# Runtime Variables
-################################################################################
-
-client = discord.Client()
-mention = None
-modules = []
-primary_modules = [] # TODO: Get rid of this shitty list
-ready = False
-servers = []
-shutdown = False
-users = []
-
-
-################################################################################
-# Core Functions
-################################################################################
-
-def cmdcollision(module, *pmods):
-    for pmod in pmods:
-        if module == pmod:
-            continue
-        if any(module.name in a.names for a in pmod.commands):
-            print("[WARN] Collision between module " + module.name + " and primary module " + pmod.name + "...")
-            return True
-    return False
-
-
-def has_access(user, command):
-    return user.privilege < 0 or command.privilege >= 0 and user.privilege >= command.privilege
-
-
-def loadstring(code, **kwargs):
-    """
-    Remote operate code from the Discord client...
-    """
-    exec(code)
-
-
-def print_line():
-    print("--------------------------------------------------------------------------------")
-
-
-def trim(string):
-    while string[-1:] == "\r" or string[-1:] == "\n":
-        string = string[:-1].strip()
-    return string
 
 
 ################################################################################
@@ -205,6 +159,81 @@ class User:
         self.data = {"privilege": 1}
         self.id = id
         self.privilege = 1
+
+
+################################################################################
+# Main Client
+################################################################################
+
+class Nyx:
+    def __init__(self):
+        self.client = discord.Client()
+        self.modules = []
+        self.ready = False
+        self.shutdown = False
+        self.users = []
+        
+    def get_module(self, name):
+        """Retrieves a module by name. First tries to search for modules by
+        their main name (O(logn)), but searches all modules by multiple names
+        if the initial search fails. (O(n^2))
+        """
+        to_return = binary_search(self.modules, name, lambda a: a.name)
+        if not to_return is None:
+            return to_return
+        for module in modules:
+            if any(name == a for a in module.names):
+                return module
+        return None
+        
+
+
+################################################################################
+# Runtime Variables
+################################################################################
+
+client = discord.Client()
+mention = None
+modules = []
+primary_modules = [] # TODO: Remove this list and use boolean flag primary on modules.
+ready = False
+servers = []
+shutdown = False
+users = []
+
+
+################################################################################
+# Core Functions
+################################################################################
+
+def cmdcollision(module, *pmods):
+    for pmod in pmods:
+        if module == pmod:
+            continue
+        if any(module.name in a.names for a in pmod.commands):
+            print("[WARN] Collision between module " + module.name + " and primary module " + pmod.name + "...")
+            return True
+    return False
+
+
+def has_access(user, command):
+    return user.privilege < 0 or command.privilege >= 0 and user.privilege >= command.privilege
+
+
+def loadstring(code, **kwargs):
+    """Remote operate code from the Discord client."""
+    exec(code)
+
+
+def print_line():
+    print("--------------------------------------------------------------------------------")
+
+
+def trim(string):
+    while string[-1:] == "\r" or string[-1:] == "\n":
+        string = string[:-1].strip()
+    return string
+
 
 
 ################################################################################

@@ -1,12 +1,12 @@
 
-# Binary search with lambdas woo fucking hoo!
+# Binary search with lambda parameter
 def binary_search(array, query, key = lambda a: a):
     if array is None or len(array) == 0:
         return None
     elif len(array) == 1:
         return key(array[0]) == query and array[0] or None
     mid = int(len(array) / 2)
-    compare_to = key(array[mid])
+    compare_to = key(array[mid]) # Applies lambda to array items.
     if query < compare_to:
         return binary_search(array[:mid], query, key)
     elif query > compare_to:
