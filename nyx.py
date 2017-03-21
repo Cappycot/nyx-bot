@@ -5,10 +5,6 @@
 # Current Task:
 # - Rewriting framework to have client as an object
 #   rather than a set of global variables.
-# Near Goals:
-# - Remove list of primary_modules and just use a boolean to denote primary status.
-# Far Goals:
-# - Move main bot code to an object instance rather than within nyx.py itself.
 
 
 ################################################################################
@@ -32,7 +28,7 @@ try:
                 token = token[:-1]
 except:
     print("[FATAL] Unable to find or read token in info file.")
-version = "0.0.2"
+version = "0.0.1" # We'll probably never get this past 0.0.X to be honest.
 
 
 ################################################################################
@@ -166,13 +162,40 @@ class User:
 ################################################################################
 
 class Nyx:
+    """The main class for holding a client and its modules.
+    More information later. This is a placeholder for multiline doc.
+    """
+    
     def __init__(self):
         self.client = discord.Client()
         self.modules = []
         self.ready = False
         self.shutdown = False
+        self.token = None
         self.users = []
-        
+    
+    
+    def loadstring(self, code, **kwargs):
+        """Remote execute code from the Discord client
+        or other sources for debugging.
+        Returns true if the code to execute runs completely without error.
+        Also reroutes print statements if kwargs contains a list named "output".
+        """
+        print_holder = print # Holds the almightly built-in function print.
+        successful = True
+        if "output" in kwargs and type(kwargs["output"]) is list:
+            print = kwargs["output"].append # Reroute output accordingly.
+        try:
+            exec(code) # Attempt to run the code. See if exceptions are thrown???
+        except:
+            error = sys.exc_info()
+            for e in error:
+                print(e) # Will tack error to whatever print is routed to.
+            successful = False
+        print = print_holder # This statement is probably unnecessary but I need to reassure myself here.
+        return successful
+    
+    
     def get_module(self, name):
         """Retrieves a module by name. First tries to search for modules by
         their main name (O(logn)), but searches all modules by multiple names
@@ -185,9 +208,11 @@ class Nyx:
             if any(name == a for a in module.names):
                 return module
         return None
-        
 
 
+
+################################################################################
+# Code to deprecate below...
 ################################################################################
 # Runtime Variables
 ################################################################################
