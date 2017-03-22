@@ -3,7 +3,7 @@
 # https://discordapp.com/oauth2/authorize?client_id=201425813965373440&scope=bot&permissions=0
 ################################################################################
 # Current Task:
-# - Rewriting framework to have client as an object
+# - Rewriting framework to have client as an object (line 160)
 #   rather than a set of global variables.
 
 
@@ -121,6 +121,9 @@ class Module:
 
 
 class Server:
+    """Class for holding preference data for Discord servers in terms of custom
+    modules imported and prefixes to use.
+    """
     def __init__(self, id):
         self.id = id
         self.modules = []
@@ -167,12 +170,29 @@ class Nyx:
     """
     
     def __init__(self):
+        # I/O Naming
+        self.mod_folder = "modules"
+        self.servers_file = "servers.nyx"
+        self.users_file = "users.nyx"
+        self.mod_prefix = "mod" # Prefix and/or suffix should be used to distinguish names from preexisting Python libraries...
+        self.mod_suffix = ""
+        # Discord Server Info
         self.client = discord.Client()
         self.modules = []
-        self.ready = False
-        self.shutdown = False
+        self.servers = []
         self.token = None
         self.users = []
+        # Runtime Status
+        self.debug = False
+        self.ready = False
+        self.shutdown = False
+    
+    
+    def init(self, info_file = None):
+        if info_file is None:
+            info_file = "info.nyx"
+        info = open(info_file, "r")
+        
     
     
     def loadstring(self, code, **kwargs):
@@ -180,6 +200,8 @@ class Nyx:
         or other sources for debugging.
         Returns true if the code to execute runs completely without error.
         Also reroutes print statements if kwargs contains a list named "output".
+        
+        code - the Python 3 code to run within self
         """
         print_holder = print # Holds the almightly built-in function print.
         successful = True
@@ -200,6 +222,8 @@ class Nyx:
         """Retrieves a module by name. First tries to search for modules by
         their main name (O(logn)), but searches all modules by multiple names
         if the initial search fails. (O(n^2))
+        
+        name - the name of the module to retrieve
         """
         to_return = binary_search(self.modules, name, lambda a: a.name)
         if not to_return is None:
@@ -209,6 +233,26 @@ class Nyx:
                 return module
         return None
 
+
+    def load_module(name, path = None):
+        """Loads a custom Nyx module into existence.
+        If the path is not specified (None),
+        then the default modules folder is used.
+        
+        Args:
+        name - the primary name of the module to load or reload
+        path - the file location of the module .py file (default None)
+        """
+        pass
+    
+    
+    def get_server(id):
+        server = binary_search(servers, id, lambda a: a.id)
+        if server is None:
+            server = Server(id)
+            servers.append(server)
+            servers.sort(key = lambda a: a.id)
+        return server
 
 
 ################################################################################

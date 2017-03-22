@@ -1,6 +1,6 @@
 
 # Binary search with lambda parameter
-def binary_search(array, query, key = lambda a: a):
+def binary_search(array, query, key = lambda a: a, start = 0, end = -1):
     """Python's 'in' keyword performs a linear search on arrays.
     Given the circumstances of storing sorted arrays, it's better
     for Nyx to use a binary search.
@@ -10,6 +10,13 @@ def binary_search(array, query, key = lambda a: a):
         return None
     elif len(array) == 1:
         return key(array[0]) == query and array[0] or None
+    
+    if end == -1:
+        end = len(array)
+    elif start >= end:
+        return None
+    mid = int(len(array) / 2)
+    
     mid = int(len(array) / 2)
     compare_to = key(array[mid]) # Applies lambda to array items.
     if query < compare_to:

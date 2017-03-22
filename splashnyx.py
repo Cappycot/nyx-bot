@@ -1,5 +1,4 @@
-# Requires colorama with init if running in Windows.
-# What the fuck am I doing with my life?
+# Splash image for console screens. No good reason for it other than it looks cool.
 
 print("                 \033[37m=")
 print("               \033[37m \033[1m\033[36m=\033[33mII\033[22m")
