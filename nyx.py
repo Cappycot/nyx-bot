@@ -189,9 +189,15 @@ class Nyx:
     
     
     def init(self, info_file = None):
+        """Loads naming information into the object
+        
+        Arguments:
+        info_file - path of the file to read for information
+        """
         if info_file is None:
             info_file = "info.nyx"
         info = open(info_file, "r")
+        return True
         
     
     
@@ -201,6 +207,7 @@ class Nyx:
         Returns true if the code to execute runs completely without error.
         Also reroutes print statements if kwargs contains a list named "output".
         
+        Arguments:
         code - the Python 3 code to run within self
         """
         print_holder = print # Holds the almightly built-in function print.
@@ -223,6 +230,7 @@ class Nyx:
         their main name (O(logn)), but searches all modules by multiple names
         if the initial search fails. (O(n^2))
         
+        Arguments:
         name - the name of the module to retrieve
         """
         to_return = binary_search(self.modules, name, lambda a: a.name)
@@ -239,7 +247,7 @@ class Nyx:
         If the path is not specified (None),
         then the default modules folder is used.
         
-        Args:
+        Arguments:
         name - the primary name of the module to load or reload
         path - the file location of the module .py file (default None)
         """

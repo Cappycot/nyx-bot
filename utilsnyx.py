@@ -5,7 +5,7 @@ def binary_search(array, query, key = lambda a: a, start = 0, end = -1):
     Given the circumstances of storing sorted arrays, it's better
     for Nyx to use a binary search.
     
-    Keyword Arguments:
+    Arguments:
     key - filter for objects in the array
     start - 0-indexed starting marker on the array to search
     end - exclusive ending marker on the array to search
@@ -36,8 +36,10 @@ def binary_search(array, query, key = lambda a: a, start = 0, end = -1):
 
 # Prints a list in legible format
 def list_string(alist, key = lambda a: a):
-    """Given items a, b, ..., x, y, z, this will print
-    "a, b, ..., x, y and z"
+    """Given items a, b, ..., x, y, z in an array,
+    this will print "a, b, ..., x, y and z"
+    
+    
     """
     if len(alist) == 0:
         return "[empty]"
