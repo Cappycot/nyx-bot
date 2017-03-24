@@ -1,23 +1,26 @@
-################################################################################
+###############################################################################
 # Nyx! A (Mostly Unison League themed) bot...
-# https://discordapp.com/oauth2/authorize?client_id=201425813965373440&scope=bot&permissions=0
-################################################################################
+"""https://discordapp.com/oauth2/authorize?client_id=
+201425813965373440&scope=bot&permissions=0"""
+###############################################################################
 # Current Task:
-# - Rewriting framework to have client as an object (line 160)
+# - Rewriting framework to have client as an object (line 170)
 #   rather than a set of global variables.
+# - Conform to Python styling guidelines laid out in PEP 8.
 
 
-################################################################################
+###############################################################################
 # Main/Global Variables
-################################################################################
+###############################################################################
 
-command_prefixes = ["$", "~", "!", "%", "^", "&", "*", "-", "=", ".", ">", "/"]
+command_prefixes = ["$", "~", "!", "%", "^", "&",
+                    "*", "-", "=", ".", ">", "/"]
 debug = True
 mod_folder = "modules"
 servers_file = "servers.nyx"
 users_file = "users.nyx"
-mod_prefix = "mod"  # Prefix and/or suffix should be used to distinguish names
-mod_suffix = ""     # from preexisting Python libraries...
+mod_prefix = "mod" # Prefix and/or suffix should be used to distinguish names
+mod_suffix = ""    # from preexisting Python libraries...
 token = None
 try:
     info = open("info.nyx", "r")
@@ -31,9 +34,9 @@ except:
 version = "0.0.1" # We'll probably never get this past 0.0.X to be honest.
 
 
-################################################################################
+###############################################################################
 # Python Libraries
-################################################################################
+###############################################################################
 
 import asyncio
 from datetime import datetime
@@ -50,9 +53,9 @@ except:
     print("[WARN] Color init failed. Output may not display properly on Windows or output files...")
 
 
-################################################################################
+###############################################################################
 # Main Object Types
-################################################################################
+###############################################################################
 
 class Command:
     def __init__(self, function, names, **args):
@@ -160,9 +163,9 @@ class User:
         self.privilege = 1
 
 
-################################################################################
+###############################################################################
 # Main Client
-################################################################################
+###############################################################################
 
 class Nyx:
     """The main class for holding a client and its modules.
@@ -174,11 +177,14 @@ class Nyx:
         self.mod_folder = "modules"
         self.servers_file = "servers.nyx"
         self.users_file = "users.nyx"
-        self.mod_prefix = "mod" # Prefix and/or suffix should be used to distinguish names from preexisting Python libraries...
+        self.mod_prefix = "mod" # Prefix and/or suffix should be used to
+                                # distinguish names from preexisting Python
+                                # libraries...
         self.mod_suffix = ""
         # Discord Server Info
         self.client = discord.Client()
         self.modules = []
+        self.mod_names = {}
         self.servers = []
         self.token = None
         self.users = []
@@ -188,7 +194,7 @@ class Nyx:
         self.shutdown = False
     
     
-    def init(self, info_file = None):
+    def init(self, info_file=None):
         """Loads naming information into the object
         
         Arguments:
@@ -242,7 +248,7 @@ class Nyx:
         return None
 
 
-    def load_module(name, path = None):
+    def load_module(name, path=None):
         """Loads a custom Nyx module into existence.
         If the path is not specified (None),
         then the default modules folder is used.
@@ -263,11 +269,11 @@ class Nyx:
         return server
 
 
-################################################################################
+###############################################################################
 # Code to deprecate below...
-################################################################################
+###############################################################################
 # Runtime Variables
-################################################################################
+###############################################################################
 
 client = discord.Client()
 mention = None
@@ -279,9 +285,9 @@ shutdown = False
 users = []
 
 
-################################################################################
+###############################################################################
 # Core Functions
-################################################################################
+###############################################################################
 
 def cmdcollision(module, *pmods):
     for pmod in pmods:
@@ -313,9 +319,9 @@ def trim(string):
 
 
 
-################################################################################
+###############################################################################
 # Module Functions
-################################################################################
+###############################################################################
 
 def get_module(name):
     to_return = binary_search(modules, name, lambda a: a.name)
@@ -406,9 +412,9 @@ def unload_module(name):
     return False
 
 
-################################################################################
+###############################################################################
 # Server Functions
-################################################################################
+###############################################################################
 
 def get_server(id):
     server = binary_search(servers, id, lambda a: a.id)
@@ -473,9 +479,9 @@ def save_servers():
         return False
 
 
-################################################################################
+###############################################################################
 # User Functions
-################################################################################
+###############################################################################
 
 def get_user(id):
     user = binary_search(users, id, lambda a: a.id)
@@ -527,9 +533,9 @@ def save_users():
         return False
 
 
-################################################################################
+###############################################################################
 # Event Handling
-################################################################################
+###############################################################################
 
 async def trigger(module, name, **kwargs):
     if client:
@@ -704,9 +710,9 @@ async def on_group_remove(channel, user):
     await trigger_modules("on_group_remove", channel = channel, user = user)
 
 
-################################################################################
+###############################################################################
 # Message Event Handler
-################################################################################
+###############################################################################
 
 # Check primary module event then command list.
 @client.event
@@ -805,9 +811,9 @@ async def on_message(message):
                 await client.send_message(message.channel, output)
 
 
-################################################################################
+###############################################################################
 # Main Background Clock
-################################################################################
+###############################################################################
 # Run the clock function on each module.
 # Get a list of messages to send and forward all of those at once.
 
@@ -851,9 +857,9 @@ async def clock():
     print_line()
 
 
-################################################################################
+###############################################################################
 # Startup Login
-################################################################################
+###############################################################################
 
 @client.event
 @asyncio.coroutine
@@ -869,9 +875,9 @@ def on_ready():
     nmention = mention[0:2] + "!" + mention[2:]
     
 
-################################################################################
+###############################################################################
 # Startup
-################################################################################
+###############################################################################
 
 def start():
     print_line()

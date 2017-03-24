@@ -5,6 +5,10 @@
 import asyncio
 
 
+class Voice:
+    def __init__(self):
+        pass
+
 ################################################################################
 # Command Functions
 ################################################################################
@@ -12,7 +16,7 @@ import asyncio
 async def sample(client = None, message = None, **_):
     return "Sample text."
 
-commands = [[["sample"], sample, "Sample text.", "sample", 1]]
+commands = [[["play"], sample, "Sample text.", "sample", 1]]
 
 
 ################################################################################
