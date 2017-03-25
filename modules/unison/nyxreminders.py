@@ -13,7 +13,7 @@ from sys import exc_info
 # Main/Global Variables
 ################################################################################
 
-ap_max = 144 # Never exceed number
+ap_max = 200 # Never exceed number
 ap_time_max = int(ap_max / 20) * 100 + (ap_max * 3) % 60
 ap_reminders = [] # Format: [time, uid, name]
 debug = False
