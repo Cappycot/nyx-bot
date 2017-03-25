@@ -10,31 +10,6 @@
 
 
 ###############################################################################
-# Main/Global Variables
-###############################################################################
-
-command_prefixes = ["$", "~", "!", "%", "^", "&",
-                    "*", "-", "=", ".", ">", "/"]
-debug = True
-mod_folder = "modules"
-servers_file = "servers.nyx"
-users_file = "users.nyx"
-mod_prefix = "mod" # Prefix and/or suffix should be used to distinguish names
-mod_suffix = ""    # from preexisting Python libraries...
-token = None
-try:
-    info = open("info.nyx", "r")
-    for line in info:
-        if line.startswith("~TOKEN:"):
-            token = line[7:]
-            while token[-1:] == "\r" or token[-1:] == "\n":
-                token = token[:-1]
-except:
-    print("[FATAL] Unable to find or read token in info file.")
-version = "0.0.1" # We'll probably never get this past 0.0.X to be honest.
-
-
-###############################################################################
 # Python Libraries
 ###############################################################################
 
@@ -75,7 +50,7 @@ class Module:
         self.folder = getcwd() + "/" + mod_folder + "/" + name
         self.module = module
         self.name = name
-        self.names = [name]
+        self.names = [name] # TODO: Remove
         self.listeners = {}
         
     def remove_command(self, name):
@@ -271,6 +246,31 @@ class Nyx:
 
 ###############################################################################
 # Code to deprecate below...
+###############################################################################
+# Main/Global Variables
+###############################################################################
+
+command_prefixes = ["$", "~", "!", "%", "^", "&",
+                    "*", "-", "=", ".", ">", "/"]
+debug = True
+mod_folder = "modules"
+servers_file = "servers.nyx"
+users_file = "users.nyx"
+mod_prefix = "mod" # Prefix and/or suffix should be used to distinguish names
+mod_suffix = ""    # from preexisting Python libraries...
+token = None
+try:
+    info = open("info.nyx", "r")
+    for line in info:
+        if line.startswith("~TOKEN:"):
+            token = line[7:]
+            while token[-1:] == "\r" or token[-1:] == "\n":
+                token = token[:-1]
+except:
+    print("[FATAL] Unable to find or read token in info file.")
+version = "0.0.1" # We'll probably never get this past 0.0.X to be honest.
+
+
 ###############################################################################
 # Runtime Variables
 ###############################################################################
