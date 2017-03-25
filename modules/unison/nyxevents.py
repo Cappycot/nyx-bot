@@ -38,6 +38,13 @@ def clear_zeroes(string):
 def datetime_match(event, time, day):
     start = event[0]
     end = event[1]
+    if start < 10000: # Test for daily events like GvG
+        shift = day * 10000
+        start += shift
+        end += shift
+        print("Calc daily occurrence for day: " + str(start))
+        print("Current time: " + str(time))
+        print("Current day: " + str(day))
     start_time = start % 10000
     end_time = end % 10000
     start_day = int(start / 10000)
@@ -165,6 +172,8 @@ def time_string(number, show_day = False):
         number -= 70000
     if number >= 10000 and show_day:
         result += days_full[int(number / 10000) - 1] + " "
+    elif show_day:
+        result += "(Daily) "
     number %= 10000
     return result + pad(int(number / 100)) + ":" + pad(number % 100)    
 
@@ -302,7 +311,7 @@ async def list_events(message = None, desc = False, usage = False, **_):
 # List the next occurrences of given events
 async def list_next_events(message = None, desc = False, usage = False, **_):
     args = message.content.lower().strip().split(" ")
-    usage_text = "Usage: $next <name1>, [name2]... [time] [day]\nAt least one event name or time must be input.\nExample: $next nyx"
+    usage_text = "Usage: $next <name1>, [name2]... [time] [day]\nAt least one event name or time must be input.\nExample: $next eggs"
     not_found = "I couldn't find any events matching your query...\nTry checking your spelling of event names or broaden your search..."
     if desc:
         return "Lists the next recurrence of a given event."

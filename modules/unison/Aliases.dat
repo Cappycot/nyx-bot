@@ -2,15 +2,18 @@
 SG: gold
 SL: super aug
 S: super
-E,K,C: reforge
-EC: eggs and kes, eggs and p
+E,K,P: reforge
+EP: eggs and kes, eggs and p
 EK: eggs and key
 # No one fucking does Keymin and Kesa anyway...
-KC: keymin and k
+KP: keymin and k
 E: egg
 K: key
-C: kesa, pasa, passa, cloud, glo
+P: kesa, pasa, passa, cloud, glo
 LV: aug
 MB: mob, path
 MM: colo, cancer
-GB: guild
+BA: b a, battle a, gba
+BB: b b, battle b, gbb
+BC: b c, battle c, gbc
+B: guild
