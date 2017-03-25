@@ -203,7 +203,8 @@ async def list_reminders(message = None, desc = False, usage = False, **_):
 async def remove_reminders(message = None, desc = False, usage = False, **_):
     global users
     args = message.content.lower().strip().split(" ")
-    usage_text = "Usage: $unremind <name1>, [name2]... [time] [day]\nAt least one event name must be input.\nExample: $unremind nyx"
+    usage_text = "**Usage:** $unremind <name1>, [name2]... [time] [day]\nAt least one event name must be input.\nExample: ``$unremind eggs``"
+    usage_text += "\n**For Guild Battles, use ``$unremind gb``**"
     if desc:
         return "Removes event reminders."
     elif usage or len(args) < 2:
@@ -215,10 +216,10 @@ async def remove_reminders(message = None, desc = False, usage = False, **_):
     remove_all = remove_all and no_args
     if no_args and not remove_all or len(events) == 0:
         return "I couldn't find any events matching your query..."
-    elif len(events) > 40 and not remove_all:
-        too_many = "I found too many events matching your query. Try narrowing your search..."
-        too_many += "\nExample: $unremind keymin monday"
-        return too_many
+    # elif len(events) > 40 and not remove_all:
+        # too_many = "I found too many events matching your query. Try narrowing your search..."
+        # too_many += "\nExample: ``$unremind keymin monday``"
+        # return too_many
     else:
         uid = message.author.id
         user = binary_search(users, uid, key = lambda a: a.id)
@@ -247,14 +248,19 @@ async def remove_reminders(message = None, desc = False, usage = False, **_):
         if not remove_all:
             for elist in listing:
                 reply += "\n - " + get_full_name(elist[0]) + ": "
-                reply += list_string(elist[1], key = lambda a: time_string(a, True))
+                if len(elist[1]) <= 10:
+                    reply += list_string(elist[1], key = lambda a: time_string(a, True))
+                else:
+                    reply += str(len(elist[1])) + " times..."
         return reply
 
 
 async def set_reminders(message = None, desc = False, usage = False, **_):
     global users
     args = message.content.lower().strip().split(" ")
-    usage_text = "Usage: $remind <name1>, [name2]... [time] [day]\nAt least one event name must be input.\nExample: $remind nyx"
+    usage_text = "**Usage:** $remind <name1>, [name2]... [time] [day]\nAt least one event name must be input.\nExample: ``$remind eggs``"
+    usage_text += "\n**For Guild Battles, be sure to specify the schedule!**"
+    usage_text += "\nExample: ``$remind guild battle a`` or ``$remind gba``"
     if desc:
         return "Sets reminders for events."
     elif usage or len(args) < 2:
@@ -266,10 +272,12 @@ async def set_reminders(message = None, desc = False, usage = False, **_):
     no_args = args[0] is None and args[1] == -1 and args[2] == -1
     if no_args or len(events) == 0:
         return "I couldn't find any events matching your query..."
-    if len(events) > 20 and not message.server is None or len(events) > 40:
-        too_many = "I found too many events matching your query. Try narrowing your search..."
-        too_many += "\nExample: $remind keymin monday"
-        return too_many
+    # if len(events) > 20 and not message.server is None or len(events) > 40:
+        # too_many = "I found too many events matching your query. Try narrowing your search..."
+        # too_many += "\nExample: ``$remind keymin monday``"
+        # too_many += "\n**For Guild Battles, be sure to specify the schedule!**"
+        # too_many += "\nExample: ``$remind guild battle a`` or ``$remind gba``"
+        # return too_many
     elif len(events) > 0:
         uid = message.author.id
         user = binary_search(users, uid, key = lambda a: a.id)
@@ -301,7 +309,10 @@ async def set_reminders(message = None, desc = False, usage = False, **_):
         reply = "I've added reminders for the following events:"
         for elist in listing:
             reply += "\n - " + get_full_name(elist[0]) + ": "
-            reply += list_string(elist[1], key = lambda a: time_string(a, True))
+            if len(elist[1]) <= 10:
+                reply += list_string(elist[1], key = lambda a: time_string(a, True))
+            else:
+                reply += str(len(elist[1])) + " times..."
         reply += "\nI will PM you reminders for these events five minutes before they start. :>"
         return reply        
 

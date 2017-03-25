@@ -289,7 +289,8 @@ async def list_events(message = None, desc = False, usage = False, **_):
     events = find_events(args[0], args[1], args[2])
     if len(events) > 40:
         too_many = "I found too many events matching your query. Try narrowing your search..."
-        too_many += "\nExample: $events reforge today"
+        too_many += "\nExample: ``$events reforge today``"
+        too_many += "\n**For Guild Battles, try the ``$remind`` feature!**"
         return too_many
     elif len(events) > 0:
         results = "**Current Events:**"
@@ -303,6 +304,8 @@ async def list_events(message = None, desc = False, usage = False, **_):
                 results += delta_string(stamp, event[1]) + " remaining."
             else:
                 results += time_string(event[0], True) + " to " + time_string(event[1])
+        if current:
+            results += "\n**For Guild Battles, use ``$remind`` for more help!**"
         return results
     else:
         return current and "This is awkward, but I don't have all the events listed yet. >.<" or "I couldn't find any events matching your query..."
