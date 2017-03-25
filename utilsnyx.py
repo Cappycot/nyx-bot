@@ -21,7 +21,7 @@ def binary_search(array, query, key = lambda a: a, start = 0, end = -1):
         return None
     
     # print(start, "and", end)
-    # mid = int(start + (end - start) / 2)
+    mid = int(start + (end - start) / 2)
     # print(mid)
     
     # mid = int(len(array) / 2)
