@@ -81,12 +81,10 @@ async def obliterate(client = None, message = None, **_):
         
         # Put it all together
         backdrop.putdata(mixdata)
-        picname = testdir + "/" + message.author.id + "s" + message.mentions[0].id + ".png"
-        
-        # TODO: Find a workaround for having to save and delete a temp file
-        backdrop.save(picname)
-        await client.send_file(message.channel, open(picname, "rb"), filename = "kill.png")
-        os.remove(picname)
+        testpic = io.BytesIO()
+        backdrop.save(testpic, format="png") # Save bytes to stream.
+        testpic.seek(0) # Move pointer to beginning so Discord can read pic.
+        await client.send_file(message.channel, testpic, filename = "kill.png")
         return "Another one bites the dust! ``*CLAP*``"
     except:
         err = exc_info()
