@@ -17,10 +17,10 @@ class SimpleStruct:
     
     def insert(self, element):
         if self.size == self.max_elements:
-            return "Too many elements!"
+            return False
         self.data.append(element)
         self.size += 1
-        return str(element) + " inserted."
+        return True
     
     def remove(self, element):
         try:

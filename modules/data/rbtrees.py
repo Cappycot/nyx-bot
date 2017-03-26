@@ -13,7 +13,101 @@ class RBTree(Tree):
     
     
     def black_contingency(self, child):
-        pass
+        """Resolves a double black situation..."""
+        # print("DB at element " + str(child.value) + "...")
+        parent = child.parent
+        # Case 0: The DB node is actually root and no one cares...
+        if parent is None:
+            return
+        
+        # Get conditions for cases...
+        rightchild = parent.right == child
+        sibling = parent.left if rightchild else parent.right
+        leftred = sibling.left is not None and sibling.left.red
+        rightred = sibling.right is not None and sibling.right.red
+        # Since rotations detach the subtree from the ancestor,
+        # the ancestor node is needed just in case.
+        grand = parent.parent
+        rightparent = grand is not None and grand.right == parent
+        # What will be the highest node in the subtree?
+        connectup = sibling
+        
+        # If the sibling is black: Perform a restructuring if we can
+        # find a red child of the sibling.
+        if not sibling.red:
+            # Case 1: The sibling is black with a red child...
+            if leftred or rightred:
+                # print("Case 1")
+                # If the red sibling child is closer to the DB node
+                # then double rotate the sibling child to parent
+                # and set that as the node to connect to ancestor.
+                if leftred and not rightchild:
+                    sibling.left.red = parent.red
+                    parent.right = self.rotate_left(sibling)
+                    # Lesson learned is that ancestors always need to be
+                    # reconnected after every rotation if like this...
+                    connectup = self.rotate_right(parent)
+                elif rightred and rightchild:
+                    sibling.right.red = parent.red
+                    parent.left = self.rotate_right(sibling)
+                    connectup = self.rotate_left(parent)
+                # If the red sibling child is farther from the DB node
+                # then single rotate the sibling to parent.
+                elif leftred and rightchild:
+                    sibling.red = parent.red
+                    sibling.left.red = False
+                    self.rotate_left(parent)
+                else:
+                    sibling.red = parent.red
+                    sibling.right.red = False
+                    self.rotate_right(parent)
+                parent.red = False
+                if grand is not None:
+                    if rightparent:
+                        grand.right = connectup
+                    else:
+                        grand.left = connectup
+            # Case 2: The sibling has no red child...
+            elif parent.red:
+                # If the parent is red, we can stop here
+                # with a simple color swap.
+                sibling.red = True
+                parent.red = False
+            else:
+                # print("Case 2")
+                # The sibling is colored red to balance with the DB
+                # node, but the problem propagates upward...
+                sibling.red = True
+                # print(self.output())
+                self.black_contingency(parent)
+        # Case 3: The sibling is red...
+        else:
+            # print("Case 3")
+            # Single rotate sibling up to parent and reconnect to
+            # ancestor. Then the DB problem propagates upward.
+            if rightchild:
+                self.rotate_left(parent)
+            else:
+                self.rotate_right(parent)
+            parent.red = True
+            sibling.red = False
+            if grand is not None:
+                if rightparent:
+                    grand.right = connectup
+                else:
+                    grand.left = connectup
+            # print(self.output())
+            self.black_contingency(child)
+    
+    
+    def remove(self, element):
+        to_delete = self.delete(self.root, element)
+        if to_delete is None:
+            return "I couldn't find " + str(element) + "..."
+        if not to_delete.red:
+            self.black_contingency(to_delete)
+        self.detach(to_delete)
+        return str(element) + " removed."
     
     
     def red_contingency(self, child):
@@ -47,8 +141,8 @@ class RBTree(Tree):
             # Perform restructuring on double red. Terminal.
             ancestor = grand.parent
             rightgrand = ancestor is not None and ancestor.right == grand
-            if self.root == grand:
-                self.root = parent if rightchild == rightparent else child
+            # if self.root == grand:
+                # self.root = parent if rightchild == rightparent else child
             # In all 4 restructuring cases, gb turns red.
             grand.red = True
             
@@ -90,12 +184,7 @@ class RBTree(Tree):
                     prev.right = newnode
                 else:
                     prev.left = newnode
-                try:
-                    self.red_contingency(newnode)
-                except:
-                    e = exc_info()
-                    for a in e:
-                        print(a)
+                self.red_contingency(newnode)
             return True
         comparison = element - cur.value
         
@@ -109,9 +198,9 @@ class RBTree(Tree):
     
     def insert(self, element):
         if self.size == self.max_elements:
-            return "Too many elements!"
+            return False
         elif element > 99:
-            return "Elements for Red-black Tree need to be 0 to 99 inclusive..."
+            return False
         success = self.binary_insert(None, self.root, element)
-        return str(element) + " inserted." if success else "I couldn't insert " + str(element) + "..."
+        return success
 

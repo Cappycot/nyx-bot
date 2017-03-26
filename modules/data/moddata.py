@@ -8,6 +8,7 @@ from sys import exc_info
 from trees import Tree
 from avltrees import AVLTree
 from rbtrees import RBTree
+from utilsnyx import list_string
 
 min_value = 0
 max_value = 999
@@ -31,15 +32,25 @@ async def insert(message = None, **_):
     if message is None:
         return "Failed!"
     args = message.content.split(" ")
-    element = 0
-    try:
-        element = int(args[1])
-        if element < 0 or element > max_value:
-            return "The integer must between 0 and " + str(max_value) + " (inclusive)."
-    except:
-        return "Specify an integer to insert."
+    if len(args) < 2:
+        return "Specify integers to insert (space-separated)."
+    inserted = []
     struct = get_data(message.author.id)
-    return struct.insert(element)
+    for i in range(1, len(args)):
+        try:
+            element = int(args[i])
+            if struct.insert(element):
+                inserted.append(element)
+        except:
+            pass
+    if len(inserted) < 1:
+        if struct.size == struct.max_elements:
+            return "We inserted the max amount of elements already..."
+        return "Specify integers between 0-999 to insert..."
+    succtext = "I inserted " + list_string(inserted) + "."
+    if struct.size == struct.max_elements:
+        succtext += " Some couldn't be inserted because we hit the max amount."
+    return succtext
 
 
 async def remove(message = None, **_):
