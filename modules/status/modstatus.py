@@ -16,7 +16,7 @@ statuses = {"green" : discord.Status.online, "yellow" : discord.Status.idle, "re
 async def game(client = None, message = None, **_):
     try:
         args = message.content.split(" ", 2)
-        title = args[2].strip()
+        title = args[2].strip().replace(client.user.mention, "@" + client.user.name)
         status = None
         for key in statuses:
             if args[1].lower().startswith(key):
