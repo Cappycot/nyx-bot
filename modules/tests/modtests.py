@@ -26,7 +26,7 @@ async def obliterate(client = None, message = None, **_):
     elif len(message.mentions) != 1 or message.server is None:
         return "We couldn't get a target, sir!"
     elif message.mentions[0] == client.user:
-        return "I'm your gunner you moron..."
+        return "I'm your gunner... moron."
     elif message.author == message.mentions[0]:
         return "What? Do you have crippling depression?"
     
@@ -36,6 +36,7 @@ async def obliterate(client = None, message = None, **_):
     
     global testdir
     try:
+        await client.send_typing(message.channel)
         # Get urls for profile pics
         url2 = victim.avatar_url
         if not url2:
@@ -56,8 +57,21 @@ async def obliterate(client = None, message = None, **_):
         
         # Paste shooter on top of tank as resized image
         shooter = shooter.resize((avatarside, avatarside), Image.LANCZOS)
-        backdrop.paste(shooter, (spos[0], spos[1],
-                        spos[0] + avatarside, spos[1] + avatarside))
+        vback = Image.new("RGB", (512, 512), (0, 0, 0))
+        vback.paste(shooter, (spos[0], spos[1],
+                    spos[0] + avatarside, spos[1] + avatarside))
+        shooter = vback.getdata()
+        backdata = backdrop.getdata()
+        mixdata = []
+        for i in range(0, len(shooter)):
+            item = shooter[i]
+            if item[0] + item[1] + item[2] == 0:
+                mixdata.append(backdata[i])
+            else:
+                mixdata.append(item)
+                
+        # backdrop.paste(shooter, (spos[0], spos[1],
+        #                spos[0] + avatarside, spos[1] + avatarside))
         
         # Rotate victim and clear out black noise
         victim = victim.resize((avatarside, avatarside), Image.LANCZOS)
@@ -67,7 +81,7 @@ async def obliterate(client = None, message = None, **_):
         vback = Image.new("RGB", (512, 512), (0, 0, 0))
         vback.paste(victim, (vpos[0], vpos[1], vpos[0] + vw, vpos[1] + vh))
         victim = vback.getdata()
-        backdata = backdrop.getdata()
+        backdata = mixdata
         mixdata = []
         for i in range(0, len(victim)):
             item = victim[i]
@@ -84,7 +98,7 @@ async def obliterate(client = None, message = None, **_):
         testpic = io.BytesIO()
         backdrop.save(testpic, format="png") # Save bytes to stream.
         testpic.seek(0) # Move pointer to beginning so Discord can read pic.
-        await client.send_file(message.channel, testpic, filename = "kill.png")
+        await client.send_file(message.channel, testpic, filename = "bwaarp.png")
         return "Another one bites the dust! ``*CLAP*``"
     except:
         err = exc_info()

@@ -6,7 +6,7 @@ import asyncio
 from importlib import reload
 from sys import exc_info
 
-module_names = ["nyxaliases", "nyxevents", "nyxreminders", "nyxmisc", "nyxspawner", "testspawner"]
+module_names = ["nyxaliases", "nyxevents", "nyxreminders", "nyxmisc", "nyxnotices", "nyxspawner", "testspawner"]
 
 folder = None
 modules = [None] * len(module_names)

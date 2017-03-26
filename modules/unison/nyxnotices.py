@@ -2,6 +2,7 @@
 
 import asyncio
 from datetime import datetime
+import discord
 from html.parser import HTMLParser
 from sys import exc_info
 import urllib3
@@ -20,9 +21,14 @@ maintenance = None
 notices = []
 updated = None
 updated_string = ""
-url_main = "http://app.en.unisonleague.com/app_en/information.php?&lang=en"
+# http://app.en.unisonleague.com/app_en/information.php?action_information_index=true&lang=en&past=1
+# url_main = "http://app.en.unisonleague.com/app_en/information.php?&lang=en"
+url_main = "http://app.en.unisonleague.com/app_en/information.php?action_information_index=true&lang="
+
+# http://app.en.unisonleague.com/app_en/information.php?action_information_detail=true&information_id=984&user_id=0&callback=information_index&row=1&lang=en
 url_side1 = "http://app.en.unisonleague.com/app_en/information.php?action_information_detail=true&information_id="
-url_side2 = "&callback=information_index"
+url_side2 = "&user_id=0&callback=information_index&row="
+# http://app.en.unisonleague.com/app_en/information.php?action_information_detail=true&information_id=984&user_id=0&callback=information_index&row=1&lang=en
 
 ################################################################################
 # Parser Classes
@@ -114,7 +120,7 @@ class EventPageParser(HTMLParser):
 
 class MainPageParser(HTMLParser):
     # Super init then set vars
-    def __init__(self, HTMLParser, lang = "en"):
+    def __init__(self, HTMLParser, lang="en"):
         HTMLParser.__init__(self)
         self.get_date = False
         self.get_time = False
@@ -130,20 +136,25 @@ class MainPageParser(HTMLParser):
                 notices.append(self.notice)
                 # print(self.notice)
             url = attrs[0][1]
-            if url_side1 in url:
+            if url_side1 in url and url_side2 in url:
                 id_start = url.index(url_side1) + len(url_side1)
+                # print("start found")
                 id_end = url.index(url_side2)
+                # print("end found")
                 id_num = url[id_start:id_end]
-                event_url = url_side1 + id_num + url_side2 + "&lang=" + self.lang
+                event_url = url_side1 + id_num + url_side2 + "1&lang=" + self.lang
+                # print(event_url)
                 event_data = http.request("GET", event_url).data.decode("UTF-8")
+                # print("send to parser")
                 e_parser = EventPageParser(HTMLParser)
                 e_parser.feed(event_data)
                 self.notice = [e_parser.title, int(id_num), None, event_url]
+                # print("keep on going")
             else:
                 self.notice = None
         elif tag == "div":
             dclass = attrs[0][1]
-            if dclass == "current_time_text":
+            if dclass == "current_time":
                 self.get_time = True
             elif dclass == "tv":
                 self.get_date = True
@@ -178,7 +189,7 @@ def get_notice(id_num, lang = "en"):
         parser.text = parser.trim()
         return parser
     except:
-        print("Error found getting notifications!")
+        print("Error while parsing notice!")
         error = exc_info()
         for e in error:
             print(e)
@@ -190,7 +201,7 @@ def update_notices(lang = "en"):
     global notices
     try:
         notices = []
-        r = http.request("GET", "http://app.en.unisonleague.com/app_en/information.php?action_information_index=true&lang=" + lang)
+        r = http.request("GET", url_main + lang)
         asdf = r.data.decode("utf-8")
         parser = MainPageParser(HTMLParser, lang)
         parser.feed(asdf)
@@ -198,7 +209,7 @@ def update_notices(lang = "en"):
         # print(notices)
         return True
     except:
-        print("Error found getting notifications!")
+        print("Error in parsing main page!")
         error = exc_info()
         for e in error:
             print(e)
@@ -208,16 +219,22 @@ def update_notices(lang = "en"):
 # Command Functions
 ################################################################################
 
-def get_notices(message, desc = False, usage = False):
+async def get_notices(client=None, message=None, desc=False, usage=False):
     usage_text = "Usage: $notices [article_id]\nExample: $notices 1"
     if desc:
         return "Retrieves events from the Unison League notices. (Takes a few seconds...)"
     elif usage:
         return usage_text
-        
+    if client is None or message is None:
+        return "Failed!"
     args = message.content.lower().split(" ")
     reply = ""
     global updated
+    
+    tosend = "" if message.server is None else message.author.mention + ", "
+    tmp = await client.send_message(message.channel, tosend + "Fetching notices... this will take a bit. >.>")
+    
+    img = None
     
     if len(args) > 1:
         id_num = 0
@@ -227,59 +244,63 @@ def get_notices(message, desc = False, usage = False):
             return usage_text
         notice = get_notice(id_num)
         if notice is None:
-            return "I wasn't able to find connect or find that notice... :<"
+            tosend += "I wasn't able to find connect or find that notice... :<"
         else:
-            reply = url_side1 + str(id_num) + url_side2 + "&lang=en\n\n"
+            reply = url_side1 + str(id_num) + url_side2 + "1&lang=en\n\n"
             reply += "**" + notice.title + "**" + notice.date + "\n\n"
             reply += notice.text
             if not notice.image is None:
-                reply += "\n\n" + notice.image
+                img = discord.Embed(color=discord.Color.purple())
+                print(notice.image)
+                try:
+                    img.set_image(url=notice.image)
+                except:
+                    error = exc_info()
+                    for a in error:
+                        print(a)
+            tosend += reply
     else:
         dtstart = datetime.now()
         if updated is None or dtstart.hour != updated.hour:
             success = update_notices()
             if not success:
-                return "I wasn't able to connect to the Unison League notices... :<"
-            updated = dtstart
-        # dtdelta = datetime.now() - dtstart
-        reply = "**Notices:**"
-        reply += "\nLast retrieved " + updated_string + "."
-        for notice in notices:
-            reply += "\n - " + notice[0] + " (" + str(notice[1]) + ")"
-        reply += "\nFor more information, use $notices <article_id>"
-    return reply
+                tosend += "I wasn't able to connect to the Unison League notices... :<"
+            else:
+                updated = dtstart
+                # dtdelta = datetime.now() - dtstart
+                reply = "**Notices:**"
+                reply += "\nLast retrieved " + updated_string + "."
+                for notice in notices:
+                    reply += "\n - " + notice[0] + " (" + str(notice[1]) + ")"
+                reply += "\nFor more information, use $notices <article_id>"
+                tosend += reply
+    await client.edit_message(tmp, tosend, embed=img)
+    return
 
 ################################################################################
 # Module Functions
 ################################################################################
 
-commands = [[["$notices", "$news", "$notice"], get_notices, True]]
+commands = [[["notices", "news", "notice"], get_notices, True]]
 
 
-def load():
+def load(folder):
     return True
 
 
-@asyncio.coroutine
-def clock(client, time):
+async def clock(client, time):
     return
 
 
-def match(message):
-    text = message.content.lower()
-    return any(any(text.startswith(b) for b in a[0]) for a in commands)
-
-
-@asyncio.coroutine
-def reply(client, message):
+async def reply(client, message):
     text = message.content.lower()
     for command in commands:
         for cmdname in command[0]:
             if text.startswith(cmdname):
                 tosend = "" if message.server is None else "<@" + message.author.id + ">, "
-                tmp = yield from client.send_message(message.channel, tosend + "Fetching notices... this will take a bit. >.>")
+                tmp = await client.send_message(message.channel, tosend + "Fetching notices... this will take a bit. >.>")
                 tosend += command[1](message)
-                yield from client.edit_message(tmp, tosend)
+                await client.edit_message(tmp, tosend)
                 return
                 
 
