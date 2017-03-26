@@ -261,19 +261,20 @@ async def get_notices(client=None, message=None, desc=False, usage=False):
             tosend += reply
     else:
         dtstart = datetime.now()
+        success = True
         if updated is None or dtstart.hour != updated.hour:
             success = update_notices()
-            if not success:
-                tosend += "I wasn't able to connect to the Unison League notices... :<"
-            else:
-                updated = dtstart
-                # dtdelta = datetime.now() - dtstart
-                reply = "**Notices:**"
-                reply += "\nLast retrieved " + updated_string + "."
-                for notice in notices:
-                    reply += "\n - " + notice[0] + " (" + str(notice[1]) + ")"
-                reply += "\nFor more information, use $notices <article_id>"
-                tosend += reply
+        if not success:
+            tosend += "I wasn't able to connect to the Unison League notices... :<"
+        else:
+            updated = dtstart
+            # dtdelta = datetime.now() - dtstart
+            reply = "**Notices:**"
+            reply += "\nLast retrieved " + updated_string + "."
+            for notice in notices:
+                reply += "\n - " + notice[0] + " (" + str(notice[1]) + ")"
+            reply += "\nFor more information, use $notices <article_id>"
+            tosend += reply
     await client.edit_message(tmp, tosend, embed=img)
     return
 
