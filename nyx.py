@@ -158,8 +158,6 @@ class Nyx:
         self.mod_suffix = ""
         # Discord Server Info
         self.client = discord.Client()
-        self.modules = []
-        self.mod_names = {}
         self.servers = []
         self.token = None
         self.users = []
