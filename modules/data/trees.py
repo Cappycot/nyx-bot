@@ -26,6 +26,7 @@ class BinaryNode:
 
 
 class Tree(SimpleStruct):
+    """Really this class should be called a BST."""
     def __init__(self, SimpleStruct):
         SimpleStruct.__init__(self)
         self.root = None
@@ -131,7 +132,22 @@ class Tree(SimpleStruct):
         if noleft and noright:
             self.max_depth = max(depth, self.max_depth)
         return False
-            
+    
+    
+    def inorder_data(self, node):
+        if node is None:
+            return
+        self.inorder_data(node.left)
+        self.data.append(node.value)
+        self.size += 1
+        self.inorder_data(node.right)
+    
+    
+    def move_to_data(self):
+        self.data = []
+        self.size = 0
+        self.inorder_data(self.root)
+        
     
     def inorder_print(self, node, lines, leftchild, pos):
         """Creates the Discord code block formatted ASCII art for
@@ -152,7 +168,7 @@ class Tree(SimpleStruct):
         
         depth = node.depth
         linepos = pos * 3
-        element = rbrender(node.value, node.red) if "RBTree" in self.type else render(node.value)
+        element = rbrender(node.value, node.red) if "Red-black Tree" in self.type else render(node.value)
         
         # Add element to ASCII picture
         lengthen = linepos - len(lines[depth * 2])

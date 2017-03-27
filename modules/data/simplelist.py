@@ -11,9 +11,9 @@ def render(element):
 class SimpleStruct:
     def __init__(self):
         self.data = []
-        self.max_elements = 20
+        self.max_elements = 40
         self.size = 0
-        self.type = "List"
+        self.type = "Basic ArrayList"
     
     def insert(self, element):
         if self.size == self.max_elements:

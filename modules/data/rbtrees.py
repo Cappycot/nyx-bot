@@ -9,7 +9,7 @@ from sys import exc_info
 class RBTree(Tree):
     def __init__(self, Tree):
         Tree.__init__(self, SimpleStruct)
-        self.type = "RBTree"
+        self.type = "Red-black Tree"
     
     
     def black_contingency(self, child):
@@ -107,6 +107,7 @@ class RBTree(Tree):
         if not to_delete.red:
             self.black_contingency(to_delete)
         self.detach(to_delete)
+        self.size -= 1
         return str(element) + " removed."
     
     
@@ -201,6 +202,7 @@ class RBTree(Tree):
             return False
         elif element > 99:
             return False
+        self.size += 1
         success = self.binary_insert(None, self.root, element)
         return success
 
