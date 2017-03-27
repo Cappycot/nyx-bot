@@ -39,7 +39,7 @@ class RBTree(Tree):
             if leftred or rightred:
                 # print("Case 1")
                 # If the red sibling child is closer to the DB node
-                # then double rotate the sibling child to parent
+                # then double rotate the sibling's child to parent
                 # and set that as the node to connect to ancestor.
                 if leftred and not rightchild:
                     sibling.left.red = parent.red
@@ -84,7 +84,7 @@ class RBTree(Tree):
         else:
             # print("Case 3")
             # Single rotate sibling up to parent and reconnect to
-            # ancestor. Then the DB problem propagates upward.
+            # ancestor. Then the DB problem restarts with child.
             if rightchild:
                 self.rotate_left(parent)
             else:
