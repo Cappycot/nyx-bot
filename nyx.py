@@ -1,17 +1,17 @@
-###############################################################################
+########################################################################
 # Nyx! A (Mostly Unison League themed) bot...
 """https://discordapp.com/oauth2/authorize?client_id=
 201425813965373440&scope=bot&permissions=0"""
-###############################################################################
-# Current Task:
-# - Rewriting framework to have client as an object (line 170)
+########################################################################
+# Current Tasks:
+# - Rewriting framework to have client as an object (see tempnyx.py)
 #   rather than a set of global variables.
 # - Conform to Python styling guidelines laid out in PEP 8.
 
 
-###############################################################################
+########################################################################
 # Python Libraries
-###############################################################################
+########################################################################
 
 import asyncio
 from datetime import datetime
@@ -25,32 +25,31 @@ try: # Bypass ANSI escape sequences on output file.
     import colorama
     colorama.init()
 except:
-    print("[WARN] Color init failed. Output may not display properly on Windows or output files...")
+    pass
 
 
-###############################################################################
+########################################################################
 # Main Object Types
-###############################################################################
+########################################################################
 
 class Command:
-    def __init__(self, function, names, **args):
+    def __init__(self, function, name, **args):
         self.desc = None
         self.function = function
-        self.name = names[0]
-        self.names = names
+        self.name = name
         self.privilege = 1
         self.usage = None
 
 
 class Module:
-    def __init__(self, name, module):
+    def __init__(self, name, module, primary=False):
         self.commands = [] # list of Command objects this module has
         # self.dir = None # removed in place of the folder variable
         self.disabled = False
         self.folder = getcwd() + "/" + mod_folder + "/" + name
         self.module = module
         self.name = name
-        self.names = [name] # TODO: Remove
+        self.names = [name]
         self.listeners = {}
         
     def remove_command(self, name):
@@ -66,6 +65,8 @@ class Module:
         self.commands.sort(key = lambda a: a.names[0])
         return command
     
+    # Listeners triggered in the Discord client will call these if
+    # there exists a listener with a matching event name.
     def set_listener(self, function, name):
         self.listeners[name] = function
     def has_listener(self, name):
@@ -138,9 +139,9 @@ class User:
         self.privilege = 1
 
 
-###############################################################################
+########################################################################
 # Main Client
-###############################################################################
+########################################################################
 
 class Nyx:
     """The main class for holding a client and its modules.
@@ -148,16 +149,10 @@ class Nyx:
     """
     
     def __init__(self):
-        # I/O Naming
-        self.mod_folder = "modules"
-        self.servers_file = "servers.nyx"
-        self.users_file = "users.nyx"
-        self.mod_prefix = "mod" # Prefix and/or suffix should be used to
-                                # distinguish names from preexisting Python
-                                # libraries...
-        self.mod_suffix = ""
         # Discord Server Info
         self.client = discord.Client()
+        self.modules = []
+        self.namemap = {}
         self.servers = []
         self.token = None
         self.users = []
@@ -205,9 +200,7 @@ class Nyx:
     
     
     def get_module(self, name):
-        """Retrieves a module by name. First tries to search for modules by
-        their main name (O(logn)), but searches all modules by multiple names
-        if the initial search fails. (O(n^2))
+        """Retrieves a module by searching for their main name (O(logn))
         
         Arguments:
         name - the name of the module to retrieve
@@ -215,9 +208,6 @@ class Nyx:
         to_return = binary_search(self.modules, name, lambda a: a.name)
         if not to_return is None:
             return to_return
-        for module in modules:
-            if any(name == a for a in module.names):
-                return module
         return None
 
 
@@ -242,11 +232,11 @@ class Nyx:
         return server
 
 
-###############################################################################
+########################################################################
 # Code to deprecate below...
-###############################################################################
+########################################################################
 # Main/Global Variables
-###############################################################################
+########################################################################
 
 command_prefixes = ["$", "~", "!", "%", "^", "&",
                     "*", "-", "=", ".", ">", "/"]
@@ -269,9 +259,9 @@ except:
 version = "0.0.1" # We'll probably never get this past 0.0.X to be honest.
 
 
-###############################################################################
+########################################################################
 # Runtime Variables
-###############################################################################
+########################################################################
 
 client = discord.Client()
 mention = None
@@ -283,9 +273,9 @@ shutdown = False
 users = []
 
 
-###############################################################################
+########################################################################
 # Core Functions
-###############################################################################
+########################################################################
 
 def cmdcollision(module, *pmods):
     for pmod in pmods:
@@ -317,9 +307,9 @@ def trim(string):
 
 
 
-###############################################################################
+########################################################################
 # Module Functions
-###############################################################################
+########################################################################
 
 def get_module(name):
     to_return = binary_search(modules, name, lambda a: a.name)
@@ -410,9 +400,9 @@ def unload_module(name):
     return False
 
 
-###############################################################################
+########################################################################
 # Server Functions
-###############################################################################
+########################################################################
 
 def get_server(id):
     server = binary_search(servers, id, lambda a: a.id)
@@ -477,9 +467,9 @@ def save_servers():
         return False
 
 
-###############################################################################
+########################################################################
 # User Functions
-###############################################################################
+########################################################################
 
 def get_user(id):
     user = binary_search(users, id, lambda a: a.id)
@@ -531,9 +521,9 @@ def save_users():
         return False
 
 
-###############################################################################
+########################################################################
 # Event Handling
-###############################################################################
+########################################################################
 
 async def trigger(module, name, **kwargs):
     if client:
@@ -708,9 +698,9 @@ async def on_group_remove(channel, user):
     await trigger_modules("on_group_remove", channel = channel, user = user)
 
 
-###############################################################################
+########################################################################
 # Message Event Handler
-###############################################################################
+########################################################################
 
 # Check primary module event then command list.
 @client.event
@@ -809,9 +799,9 @@ async def on_message(message):
                 await client.send_message(message.channel, output)
 
 
-###############################################################################
+########################################################################
 # Main Background Clock
-###############################################################################
+########################################################################
 # Run the clock function on each module.
 # Get a list of messages to send and forward all of those at once.
 
@@ -855,9 +845,9 @@ async def clock():
     print_line()
 
 
-###############################################################################
+########################################################################
 # Startup Login
-###############################################################################
+########################################################################
 
 @client.event
 @asyncio.coroutine
@@ -873,9 +863,9 @@ def on_ready():
     nmention = mention[0:2] + "!" + mention[2:]
     
 
-###############################################################################
+########################################################################
 # Startup
-###############################################################################
+########################################################################
 
 def start():
     print_line()
