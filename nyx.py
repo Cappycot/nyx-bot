@@ -33,10 +33,11 @@ except:
 ########################################################################
 
 class Command:
-    def __init__(self, function, name, **args):
+    def __init__(self, function, names, **args):
         self.desc = None
         self.function = function
-        self.name = name
+        self.name = names[0]
+        self.names = names
         self.privilege = 1
         self.usage = None
 

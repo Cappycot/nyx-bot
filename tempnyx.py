@@ -2,12 +2,13 @@
 # Nyx! A (Mostly Unison League themed) bot...
 """https://discordapp.com/oauth2/authorize?client_id=
 201425813965373440&scope=bot&permissions=0"""
+# https://drive.google.com/open?id=0B94jrO7TTwmORFlpeTJ1Z09UVEU
 ########################################################################
 # Current Tasks:
-# - Rewriting framework to have client as an object (see tempnyx.py)
+# - Rewriting framework to have client as an object.
 #   rather than a set of global variables.
 # - Conform to Python styling guidelines laid out in PEP 8.
-#   (Meaning lines are <= 80 chars and comments <= 72 chars length.)
+#   (Meaning lines are < 80 chars and comments <= 72 chars length.)
 # Future Tasks:
 # - Move all module code on repo to the new Nyx-Modules repo.
 # - Github API for automatic code updates?
@@ -24,7 +25,7 @@ from importlib import reload
 from os import getcwd, listdir, mkdir
 from os.path import isfile
 from utilsnyx import binary_search
-# TODO:
+# TODO: Decide specific sys imports
 import sys
 
 
@@ -33,11 +34,10 @@ import sys
 ########################################################################
 
 class Command:
-    def __init__(self, function, names, **args):
+    def __init__(self, function, name, **args):
         self.desc = None
         self.function = function
-        self.name = names[0]
-        self.names = names
+        self.names = [name]
         self.privilege = 1
         self.usage = None
 
@@ -47,7 +47,7 @@ class Module:
         self.commands = []
         # self.dir = None # removed in place of the folder variable
         self.disabled = False
-        self.folder = getcwd() + "/" + mod_folder + "/" + name
+        self.folder = None
         self.module = module
         self.name = name
         self.primary = primary
@@ -86,35 +86,33 @@ class Server:
         self.id = id
         self.modules = []
         self.prefixes = []
+        self.server = None
         
     def import_mod(self, module):
-        if module is None:
-            return False
-        for mod in modules:
-            for cmd in module.commands:
-                if any(cmd in a.names for a in mod.commands) or cmd == mod.name:
-                    return False
-        self.modules.append(module)
-        return True
+        pass
     
     def deport_mod(self, module):
-        if module in self.modules:
-            self.modules.remove(module)
-            return True
-        return False
+        pass
+        
     def deport(self, module):
         return self.deport_mod(module)
 
     def get_server(self):
-        global client
-        client.servers.sort(key = lambda a: a.id)
-        return binary_search(client.servers, self.id, lambda a: a.id)
+        pass
 
 
 class User:
+    """Class for storing specific data for a Discord user.
+    Only the user ID of a Discord User is stored between
+    sessions outside of permissions and module-specific data.
+    """
     def __init__(self, id):
         self.data = {"privilege": 1}
         self.id = id
+        self.user = None
+    
+    def get_privilege(self):
+        return self.data["privilege"]
 
 
 ########################################################################
@@ -135,6 +133,7 @@ class Nyx:
         self.servers = []
         self.token = None
         self.users = []
+        self.users_folder = None
         # Runtime Status
         self.debug = False
         self.ready = False
@@ -197,7 +196,7 @@ class Nyx:
         return None
 
 
-    def load_module(name, path):
+    def load_module(self, nyx_module):
         """Loads a custom Nyx module into existence.
         If the path is not specified (None),
         then the default modules folder is used.
@@ -209,13 +208,16 @@ class Nyx:
         pass
     
     
-    def get_server(id):
+    def get_server(self, discord_server):
         server = binary_search(servers, id, lambda a: a.id)
         if server is None:
             server = Server(id)
             servers.append(server)
             servers.sort(key = lambda a: a.id)
         return server
+    
+    def get_user(self, discord_user):
+        pass
 
 
 ########################################################################
