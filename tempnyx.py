@@ -13,6 +13,10 @@
 # - Move all module code on repo to the new Nyx-Modules repo.
 # - Github API for automatic code updates?
 
+# Experimental Startup Parameters:
+modules_folder = "modules"
+servers_folder = "servers"
+users_folder = "users"
 
 ########################################################################
 # Python Libraries
@@ -25,7 +29,7 @@ from importlib import reload
 from os import getcwd, listdir, mkdir
 from os.path import isfile
 from utilsnyx import binary_search
-# TODO: Decide specific sys imports
+# TODO: Decide specific sys imports to use?
 import sys
 
 
@@ -34,36 +38,37 @@ import sys
 ########################################################################
 
 class Command:
-    def __init__(self, function, name, **args):
-        self.desc = None
+    
+
+    def __init__(self, function, name, **_):
         self.function = function
-        self.names = [name]
-        self.privilege = 1
-        self.usage = None
+        self.name = name
 
 
 class Module:
-    def __init__(self, name, module, primary=False):
+    
+
+    def __init__(self, name, folder, module=None, primary=False):
         self.commands = []
-        # self.dir = None # removed in place of the folder variable
+        self.command_map = {}
         self.disabled = False
-        self.folder = None
+        self.folder = folder
         self.module = module
         self.name = name
         self.primary = primary
         self.listeners = {}
         
     def remove_command(self, name):
-        to_remove = binary_search(self.commands, name, lambda a: a.names[0])
+        to_remove = binary_search(self.commands, name, lambda a: a.name)
         if to_remove is None:
             return False
         self.commands.remove(to_remove)
         return True
-    def add_command(self, function, names):
-        self.remove_command(names[0])
-        command = Command(function, names)
+    def add_command(self, function, name):
+        self.remove_command(name)
+        command = Command(function, name)
         self.commands.append(command)
-        self.commands.sort(key = lambda a: a.names[0])
+        self.commands.sort(key=lambda a: a.names[0])
         return command
     
     # Listeners triggered in the Discord client will call these if
@@ -78,24 +83,35 @@ class Module:
         return await self.listeners[name](**kwargs)
 
 
-class Server:
+class ServerData:
     """Class for holding preference data for Discord servers
     in terms of custom modules imported and prefixes to use.
     """
-    def __init__(self, id):
-        self.id = id
+    def __init__(self, discord_server):
+        # id variable just in case a function references
+        # the id parameter from this type of object.
+        self.id = discord_server.id
+        self.command_map = {}
+        self.data = {}
         self.modules = []
         self.prefixes = []
-        self.server = None
+    
+    
+    def update_command_map(self):
+        pass
+        
         
     def import_mod(self, module):
         pass
-    
+        
+        
     def deport_mod(self, module):
         pass
         
+        
     def deport(self, module):
         return self.deport_mod(module)
+        
 
     def get_server(self):
         pass
@@ -106,13 +122,18 @@ class User:
     Only the user ID of a Discord User is stored between
     sessions outside of permissions and module-specific data.
     """
-    def __init__(self, id):
+    def __init__(self, discord_user):
         self.data = {"privilege": 1}
-        self.id = id
-        self.user = None
+        self.id = discord_user.id
+        self.user = discord_user
+        
     
     def get_privilege(self):
         return self.data["privilege"]
+    
+    
+    def set_privilege(self, level):
+        self.data["privilege"] = level
 
 
 ########################################################################
@@ -123,34 +144,26 @@ class Nyx:
     """The main class for holding a client and its modules.
     More information later. This is a placeholder for multiline doc.
     """
-    
     def __init__(self):
+        # TODO: Group variables in some fashion.
         self.client = discord.Client()
         self.command_map = {}
         self.modules = []
-        # Hashmap of module names to module objects
+        self.modules_folder = None
         self.module_map = {}
-        self.servers = []
+        # Prefix and/or suffix should be used to distinguish names
+        # from preexisting Python libraries...
+        self.mod_prefix = "mod"
+        self.mod_suffix = ""
+        self.servers = {}
+        self.servers_folder = None
         self.token = None
-        self.users = []
+        self.users = {}
         self.users_folder = None
         # Runtime Status
         self.debug = False
         self.ready = False
         self.shutdown = False
-    
-    
-    def init(self, info_file=None):
-        """Loads naming information into the object
-        
-        Arguments:
-        info_file - path of the file to read for information
-        """
-        if info_file is None:
-            info_file = "info.nyx"
-        info = open(info_file, "r")
-        return True
-        
     
     
     def loadstring(self, code, **kwargs):
@@ -184,40 +197,164 @@ class Nyx:
     
     
     def get_module(self, name):
-        """Retrieves a module by searching for their main name.
-        Uses binary_search because Python's if in list is linear.
-        
-        Arguments:
-        name - the name of the module to retrieve
-        """
-        to_return = binary_search(self.modules, name, lambda a: a.name)
-        if to_return is not None:
-            return to_return
+        """Retrieve a Module object by name."""
+        if name in self.module_map:
+            return self.module_map[name]
         return None
-
-
-    def load_module(self, nyx_module):
-        """Loads a custom Nyx module into existence.
-        If the path is not specified (None),
-        then the default modules folder is used.
-        
-        Arguments:
-        name - the primary name of the module to load or reload
-        path - the file location of the module .py file 
+    
+    
+    def get_server_data(self, discord_server):
+        """Retrieves the ServerData object for a particular Discord
+        server. If such ServerData does not exist, then create a new
+        object to hold data.
         """
-        pass
-    
-    
-    def get_server(self, discord_server):
-        server = binary_search(servers, id, lambda a: a.id)
-        if server is None:
-            server = Server(id)
-            servers.append(server)
-            servers.sort(key = lambda a: a.id)
+        server = None
+        # Since both Discord Server and ServerData have a string id
+        # parameter, this will still be okay if ServerData is passed.
+        if discord_server.id not in self.servers:
+            server = Server(discord_server)
+            self.servers[discord_server.id] = server
+        else:
+            server = self.servers[discord_server.id]
         return server
     
+    
+    def save_server_data(self, discord_server):
+        """Saves a single instance of ServerData to a file in the
+        specified servers folder.
+        """
+        server = self.get_server_data(discord_server)
+        server_file = getcwd() + "/" + self.servers_folder + "/" + server.id
+        try:
+            data = open(server_file, "w")
+            if len(server.modules > 0):
+                data.write("modules:")
+                data.write(server.modules[0].name)
+                for i in range(1, len(server.modules)):
+                    data.write("/" + server.modules[i].name)
+                data.write("\n")
+            if len(server.prefixes) > 0:
+                data.write("prefixes:" + server.prefixes[0])
+                for i in range(1, len(server.prefixes)):
+                    data.write(" " + server.prefixes[i])
+                data.write("\n")
+            for key in server.data:
+                data.write(key + ":" + str(server.data[key]) + "\n")
+            data.flush()
+            data.close()
+            return True
+        except:
+            return False
+    
+    
+    def save_servers_data(self):
+        """Attempt to save the data for all servers. Will return
+        false if any (yes any lol) server fails to save properly.
+        Not recommended to call this method from more than one
+        module!!
+        """
+        return all(self.save_server_data(self, self.servers[sid])
+                    for sid in self.servers)
+    
+    
     def get_user(self, discord_user):
+        """Retrieves the User object for a particular Discord user.
+        If such a User does not exist, then create a new object to
+        hold data.
+        """
+        user = None
+        if discord_user.id not in self.users:
+            user = User(discord_user)
+            self.users[discord_user.id] = user
+        else:
+            user = self.users[discord_user.id]
+            # May need to update Discord User object depending on how
+            # discord.py handles the uniqueness of User objects?
+        return user
+    
+    
+    def save_user(self, discord_user):
+        """Saves a single instance of User to a file in the
+        specified users folder.
+        """
+        user = self.get_user(discord_user)
+        user_file = getcwd() + "/" + self.users_folder + "/" + user.id
+        try:
+            data = open(user_file, "w")
+            data.write("data:\n")
+            for key in user.data:
+                data.write(key + ":" + str(user.data[key]) + "\n")
+            data.flush()
+            data.close()
+            return True
+        except:
+            return False
+    
+    
+    def save_users(self):
+        """Attempt to save the data for all users. Will return
+        false if any (yes any lol) user fails to save properly.
+        Not recommended to call this method from more than one
+        module!!
+        """
+        return all(self.save_user(self, self.users[uid]) for uid in self.users)
+    
+    
+    def update_maps(self):
         pass
+    
+    
+    def load_module(self, name):
+        """Loads a custom Nyx module into existence."""
+        module = self.get_module(name)
+        try:
+            if module is None:
+                path = getcwd() + "/" + self.modules_folder + "/" + name
+                # Add folder of module to import.
+                sys.path.append(path)
+                module = Module(name, path)
+                module.module = __import__(self.mod_prefix
+                                            + name + self.mod_suffix)
+                # TODO: Call init on module
+                module.module.init(client=self, module=module)
+                self.modules.append(module)
+                self.modules.sort(key=lambda a:a.name)
+            elif self.debug:
+                module.module = reload(module.module)
+                module.module.init(client=self, module=module)
+                # TODO: Call init on module
+            else:
+                return False
+            self.update_maps()
+            return True # haha poor logical flow
+        except:
+            # TODO: Some error stuff
+            return False
+    
+    
+    def load_modules(self):
+        pass
+    
+    
+    def load_server_data(self, servers_folder=None):
+        if self.servers_folder is None:
+            self.servers_folder = servers_folder
+        if self.servers_folder is None:
+            return False
+        
+        return True
+    
+    
+    def load_servers_data(self, servers_folder=None):
+        return load_server_data(self, servers_folder=servers_folder)
+    
+    
+    def load_users(self, users_folder=None):
+        if self.users_folder is None:
+            self.users_folder = users_folder
+        if self.users_folder is None:
+            return False
+        return True
 
 
 ########################################################################
@@ -232,6 +369,9 @@ def print_line():
 
 # Default startup sequence if this .py file is run.
 if __name__ == "__main__":
+    # global modules_folder
+    # global servers_folder
+    # global users_folder
     try: # Bypass ANSI escape sequences on output file.
         import colorama
         colorama.init()
@@ -240,6 +380,10 @@ if __name__ == "__main__":
     print_line()
     import splashnyx # Nyx art splash
     print_line()
+    nyx = Nyx()
+    nyx.modules_folder = modules_folder
+    nyx.servers_folder = servers_folder
+    nyx.users_folder = users_folder
 
 
 
