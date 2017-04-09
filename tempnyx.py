@@ -31,6 +31,7 @@ from os.path import isfile
 from utilsnyx import binary_search
 # TODO: Decide specific sys imports to use?
 import sys
+# TODO: kete; Setsunasa ni wa namae o tsukeyou ka "Snow halation"
 
 
 ########################################################################
@@ -57,13 +58,16 @@ class Module:
         self.name = name
         self.primary = primary
         self.listeners = {}
-        
+    
+    
     def remove_command(self, name):
         to_remove = binary_search(self.commands, name, lambda a: a.name)
         if to_remove is None:
             return False
         self.commands.remove(to_remove)
         return True
+    
+    
     def add_command(self, function, name):
         self.remove_command(name)
         command = Command(function, name)
@@ -71,13 +75,16 @@ class Module:
         self.commands.sort(key=lambda a: a.names[0])
         return command
     
+    
     # Listeners triggered in the Discord client will call these if
     # there exists a listener with a matching event name.
     def set_listener(self, function, name):
         self.listeners[name] = function
     
+    
     def has_listener(self, name):
         return name in self.listeners
+    
     
     async def call_listener(self, name, **kwargs):
         return await self.listeners[name](**kwargs)
@@ -87,10 +94,10 @@ class ServerData:
     """Class for holding preference data for Discord servers
     in terms of custom modules imported and prefixes to use.
     """
-    def __init__(self, discord_server):
+    def __init__(self, id):
         # id variable just in case a function references
         # the id parameter from this type of object.
-        self.id = discord_server.id
+        self.id = id
         self.command_map = {}
         self.data = {}
         self.modules = []
@@ -122,7 +129,7 @@ class User:
     Only the user ID of a Discord User is stored between
     sessions outside of permissions and module-specific data.
     """
-    def __init__(self, discord_user):
+    def __init__(self, discord_user, id=None):
         self.data = {"privilege": 1}
         self.id = discord_user.id
         self.user = discord_user
@@ -134,6 +141,19 @@ class User:
     
     def set_privilege(self, level):
         self.data["privilege"] = level
+
+
+########################################################################
+# Utility
+########################################################################
+
+def trim(string):
+    """Removes all carriage returns, newlines, and spaces from the
+    target string. Not sure how much this operation costs.
+    """
+    while string[-1:] == "\r" or string[-1:] == "\n":
+        string = string[:-1].strip()
+    return string
 
 
 ########################################################################
@@ -152,9 +172,11 @@ class Nyx:
         self.modules_folder = None
         self.module_map = {}
         # Prefix and/or suffix should be used to distinguish names
-        # from preexisting Python libraries...
+        # from preexisting Python libraries.
         self.mod_prefix = "mod"
         self.mod_suffix = ""
+        # TODO: May want to change "servers" to "server_data" as servers
+        # typically refers to discord.Client.servers...
         self.servers = {}
         self.servers_folder = None
         self.token = None
@@ -167,12 +189,10 @@ class Nyx:
     
     
     def loadstring(self, code, **kwargs):
-        """Remote execute code from the Discord client
-        or other sources for debugging.
-        Returns true if the code to execute
-        runs completely without error.
-        This function also reroutes print statements if
-        kwargs contains a list named "output".
+        """Remote execute code from the Discord client or other sources
+        for debugging. This returns true if the code to execute runs
+        completely without error. This function also reroutes print
+        statements if kwargs contains a list named "output".
         
         Arguments:
         code - the Python 3 code to run within self
@@ -212,7 +232,7 @@ class Nyx:
         # Since both Discord Server and ServerData have a string id
         # parameter, this will still be okay if ServerData is passed.
         if discord_server.id not in self.servers:
-            server = Server(discord_server)
+            server = ServerData(discord_server.id)
             self.servers[discord_server.id] = server
         else:
             server = self.servers[discord_server.id]
@@ -270,6 +290,9 @@ class Nyx:
             user = self.users[discord_user.id]
             # May need to update Discord User object depending on how
             # discord.py handles the uniqueness of User objects?
+            # Or if we never really instantiated the object?
+            if user.user.display_name is None:
+                user.user = discord_user
         return user
     
     
@@ -297,7 +320,10 @@ class Nyx:
         Not recommended to call this method from more than one
         module!!
         """
-        return all(self.save_user(self, self.users[uid]) for uid in self.users)
+        success = True
+        for uid in self.users:
+            success = self.save_user(self, self.users[uid]) and success
+        return success
     
     
     def update_maps(self):
@@ -321,8 +347,8 @@ class Nyx:
                 self.modules.sort(key=lambda a:a.name)
             elif self.debug:
                 module.module = reload(module.module)
-                module.module.init(client=self, module=module)
                 # TODO: Call init on module
+                module.module.init(client=self, module=module)
             else:
                 return False
             self.update_maps()
@@ -332,29 +358,102 @@ class Nyx:
             return False
     
     
-    def load_modules(self):
-        pass
+    def load_modules(self, modules_folder=None):
+        if modules_folder is not None:
+            self.modules_folder = modules_folder
+        if self.modules_folder is None:
+            return False
+        path = getcwd() + "/" + self.modules_folder + "/"
+        success = True
+        for modpath in listdir(path):
+            if isfile(modpath):
+                continue
+            mod_name = str(modpath)
+            success = self.load_module(mod_name) and success
+        return success
+        
+    
+    def load_server_data(self, id):
+        """asdf"""
+        path = getcwd() + "/" + self.servers_folder + "/" + id
+        try:
+            data = open(path, "r")
+            server_data = None
+            if id in self.servers:
+                server_data = self.servers[id]
+            else:
+                server_data = ServerData(id)
+                self.servers[id] = server_data
+            # TODO: Update ServerData data dictionary
+            args = line.split(":", 1)
+            if "module" in args[0]:
+                pass # TODO: code to add Modules into ServerData
+            elif "prefix" in args[0]:
+                pass # TODO: code to add prefixes into ServerData
+            else:
+                server_data.data[args[0]] = args[1]
+            return True
+        except:
+            return False
     
     
-    def load_server_data(self, servers_folder=None):
+    def load_servers_data(self, servers_folder=None):
         if self.servers_folder is None:
             self.servers_folder = servers_folder
         if self.servers_folder is None:
             return False
-        
-        return True
+        path = getcwd() + "/" + self.servers_folder + "/"
+        success = True
+        for svrpath in listdir(path):
+            if not isfile(svrpath):
+                continue
+            sid = str(svrpath)
+            success = self.load_server_data(sid) and success
+        return success
     
     
-    def load_servers_data(self, servers_folder=None):
-        return load_server_data(self, servers_folder=servers_folder)
+    def load_user(self, id):
+        """asdf"""
+        path = getcwd() + "/" + self.users_folder + "/" + id
+        try:
+            data = open(path, "r")
+            # TODO: Find User data object.
+            user = None
+            if id in self.users:
+                user = self.users[id]
+            else: # Force creation of new User object.
+                placeholder = discord.User()
+                placeholder.id = id
+                user = self.get_user(placeholder)
+            # TODO: Update User data dictionary.
+            for line in data:
+                line = trim(line)
+                if not line:
+                    continue
+                args = line.split(":", 1)
+                if args[0] == "privilege":
+                    args[1] = int(args[1])
+                user.data[args[0]] = args[1]
+            return True
+        except:
+            return False
     
     
     def load_users(self, users_folder=None):
+        """asdf"""
+        # Check if a specific folder is designated.
         if self.users_folder is None:
             self.users_folder = users_folder
         if self.users_folder is None:
             return False
-        return True
+        path = getcwd() + "/" + self.users_folder + "/"
+        success = True
+        for usrpath in listdir(path):
+            if not isfile(usrpath):
+                continue
+            uid = str(usrpath)
+            success = self.load_user(uid) and success
+        return success
 
 
 ########################################################################
