@@ -179,6 +179,7 @@ class ServerData:
     
     
     def deport(self, module):
+        """Alias for deport_mod."""
         return self.deport_mod(module)
 
 
@@ -243,6 +244,7 @@ class Nyx:
         # Runtime Status
         self.debug = False
         self.ready = False
+        self.restart = False
         self.shutdown = False
     
     
@@ -519,11 +521,14 @@ class Nyx:
             return False
         path = getcwd() + "/" + self.users_folder + "/"
         success = True
-        for usrpath in listdir(path):
-            if not isfile(usrpath):
-                continue
-            uid = str(usrpath)
-            success = self.load_user(uid) and success
+        try:
+            for usrpath in listdir(path):
+                if not isfile(usrpath):
+                    continue
+                uid = str(usrpath)
+                success = self.load_user(uid) and success
+        except FileNotFoundError:
+            mkdir(path)
         return success
 
 
@@ -532,8 +537,7 @@ class Nyx:
 ########################################################################
 
     async def trigger(self, module, name, **kwargs):
-        if self.client is not None:
-            await client.wait_until_ready()
+        await self.client.wait_until_ready()
         if module.has_listener(name) and not await \
             module.call_listener(name, client = self, **kwargs) is None:
             return True
@@ -543,22 +547,35 @@ class Nyx:
     async def trigger_modules(self, name, server=None, **kwargs):
         if server is None:
             for module in self.modules:
-                await trigger(module, name, server = server, **kwargs)
+                await self.trigger(module, name, server = server, **kwargs)
         else:
             imports = self.get_server_data(server).modules
             for module in self.modules:
                 if module.primary or module in imports:
-                    await trigger(module, name, server = server, **kwargs)
+                    await self.trigger(module, name, server = server, **kwargs)
     
     
     def connect_events(self):
         """Sets up listeners for triggering Modules for events."""
         client = self.client
         
+        
         @client.event
         async def on_ready():
             await self.trigger_modules("on_ready")
             print("on_ready")
+        
+        
+########################################################################
+# Main Message Event
+########################################################################
+
+        @client.event
+        async def on_message(message):
+            if message.author.id == client.user.id:
+                return
+            # TODO: Main on_message handling
+            print(message.content)
 
 
 ########################################################################
@@ -609,6 +626,9 @@ if __name__ == "__main__":
                     token = token[:-1]
     except:
         print("[FATAL] Unable to find or read token in info file.")
+    nyx.load_modules()
+    nyx.load_servers_data()
+    nyx.load_users()
     nyx.token = token
     nyx.start()
 
