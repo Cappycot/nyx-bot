@@ -11,7 +11,7 @@
 #   (Meaning lines are < 80 chars and comments <= 72 chars length.)
 # Future Tasks:
 # - Move all module code on repo to the new Nyx-Modules repo.
-# - Github API for automatic code updates?
+# - Figure out Github API for automatic code updates?
 
 # Experimental Startup Parameters:
 modules_folder = "modules"
@@ -39,17 +39,30 @@ import sys
 ########################################################################
 
 class Command:
-    
-
-    def __init__(self, function, name, **_):
+    """Holder object for a single function that originates from a
+    particular module that is imported into Nyx. Command alias
+    system is still a WIP.
+    """
+    def __init__(self, function, name, names=None, **kwargs):
         self.function = function
         self.name = name
+        self.names = []
+        self.data = {}
+        if name is not None:
+            self.names.append(name)
+        if names is not None:
+            self.names.extend(names)
+            if name is None:
+                name = names[0]
+        for key in kwargs:
+            data[key] = kwargs[key]
 
 
 class Module:
-    
-
-    def __init__(self, name, folder, module=None, primary=False):
+    """Holder object for a particular module that is imported into Nyx.
+    The command mapping system is still a WIP.
+    """
+    def __init__(self, name, folder, module=None, primary=False, **kwargs):
         self.commands = []
         self.command_map = {}
         self.disabled = False
@@ -60,33 +73,57 @@ class Module:
         self.listeners = {}
     
     
+    def update_command_map(self):
+        """Probably-costly operation to reset the command_map and
+        map each Command name to the Command itself to allow for
+        O(1) time to search for a Command.
+        """
+        self.command_map.clear()
+        for command in self.commands:
+            for name in command.names:
+                self.command_map[name] = command
+    
+    
     def remove_command(self, name):
-        to_remove = binary_search(self.commands, name, lambda a: a.name)
-        if to_remove is None:
+        """Completely removes a Command from the Module listing.
+        Will automatically perform a remapping of names to Commands.
+        """
+        remove = self.command_map.get(name, None)
+        if remove is None:
             return False
-        self.commands.remove(to_remove)
+        self.commands.remove(remove)
+        self.update_command_map()
         return True
     
     
-    def add_command(self, function, name):
+    def add_command(self, function, name, **kwargs):
+        """Adds a command to the Module listing."""
         self.remove_command(name)
         command = Command(function, name)
+        if command.name is None:
+            return None
         self.commands.append(command)
-        self.commands.sort(key=lambda a: a.names[0])
+        self.command_map[name] = command
+        # self.commands.sort(key=lambda a: a.name)
         return command
     
     
     # Listeners triggered in the Discord client will call these if
     # there exists a listener with a matching event name.
     def set_listener(self, function, name):
+        """Designate a function to be called upon a certain event
+        name.
+        """
         self.listeners[name] = function
     
     
     def has_listener(self, name):
+        """Checks to see if event listener is designated for a name."""
         return name in self.listeners
     
     
     async def call_listener(self, name, **kwargs):
+        """asdf"""
         return await self.listeners[name](**kwargs)
 
 
@@ -105,23 +142,44 @@ class ServerData:
     
     
     def update_command_map(self):
-        pass
-        
-        
+        """Probably-costly operation to reset the command_map and
+        map each Command name to the Command itself to allow for
+        O(1) time to search for a Command.
+        """
+        self.command_map.clear()
+        for module in self.modules:
+            for cmdname in module.command_map:
+                self.command_map[cmdname] = module.command_map[cmdname]
+    
+    
     def import_mod(self, module):
-        pass
-        
-        
+        """Adds a module to the list of imported modules if it is not
+        currently on the list of imported modules.
+        """
+        # TODO: Maybe change this to binary_search function to avoid
+        # O(n^2) worst case not found time.
+        if module is None or module in self.modules:
+            return False
+        modules.append(module)
+        for cmdname in module.command_map:
+            self.command_map[cmdname] = module.command_map[cmdname]
+        return True
+    
+    
     def deport_mod(self, module):
-        pass
-        
-        
+        """Removes a module from the list of imported modules if it is
+        currently on the list of imported modules.
+        """
+        # TODO: Maybe change this to binary_search...
+        if module not in self.modules:
+            return False
+        self.modules.remove(module)
+        self.update_command_map()
+        return True
+    
+    
     def deport(self, module):
         return self.deport_mod(module)
-        
-
-    def get_server(self):
-        pass
 
 
 class User:
@@ -259,7 +317,8 @@ class Nyx:
                     data.write(" " + server.prefixes[i])
                 data.write("\n")
             for key in server.data:
-                data.write(key + ":" + str(server.data[key]) + "\n")
+                if key is not "modules" and key is not "prefixes":
+                    data.write(key + ":" + str(server.data[key]) + "\n")
             data.flush()
             data.close()
             return True
@@ -359,6 +418,7 @@ class Nyx:
     
     
     def load_modules(self, modules_folder=None):
+        """asdf"""
         if modules_folder is not None:
             self.modules_folder = modules_folder
         if self.modules_folder is None:
@@ -385,19 +445,30 @@ class Nyx:
                 server_data = ServerData(id)
                 self.servers[id] = server_data
             # TODO: Update ServerData data dictionary
-            args = line.split(":", 1)
-            if "module" in args[0]:
-                pass # TODO: code to add Modules into ServerData
-            elif "prefix" in args[0]:
-                pass # TODO: code to add prefixes into ServerData
-            else:
-                server_data.data[args[0]] = args[1]
-            return True
+            success = True
+            for line in data:
+                line = trim(line)
+                args = line.split(":", 1)
+                if "modules" in args[0]:
+                    # TODO: code to add Modules into ServerData
+                    args = args[1].split("/")
+                    for modname in args:
+                        module = self.get_module(modname)
+                        if module is not None:
+                            success = server_data.import_mod(module) \
+                                        and success
+                elif "prefixes" in args[0]:
+                    # TODO: code to add prefixes into ServerData
+                    server_data.prefixes = args[1].split(" ")
+                else:
+                    server_data.data[args[0]] = args[1]
+            return success
         except:
             return False
     
     
     def load_servers_data(self, servers_folder=None):
+        """asdf"""
         if self.servers_folder is None:
             self.servers_folder = servers_folder
         if self.servers_folder is None:
@@ -457,6 +528,50 @@ class Nyx:
 
 
 ########################################################################
+# Client Events
+########################################################################
+
+    async def trigger(self, module, name, **kwargs):
+        if self.client is not None:
+            await client.wait_until_ready()
+        if module.has_listener(name) and not await \
+            module.call_listener(name, client = self, **kwargs) is None:
+            return True
+        return False
+
+
+    async def trigger_modules(self, name, server=None, **kwargs):
+        if server is None:
+            for module in self.modules:
+                await trigger(module, name, server = server, **kwargs)
+        else:
+            imports = self.get_server_data(server).modules
+            for module in self.modules:
+                if module.primary or module in imports:
+                    await trigger(module, name, server = server, **kwargs)
+    
+    
+    def connect_events(self):
+        """Sets up listeners for triggering Modules for events."""
+        client = self.client
+        
+        @client.event
+        async def on_ready():
+            await self.trigger_modules("on_ready")
+            print("on_ready")
+
+
+########################################################################
+# Client Startup
+########################################################################
+
+    def start(self):
+        self.connect_events()
+        self.client.run(self.token)
+        print("ended")
+
+
+########################################################################
 # Startup
 ########################################################################
 
@@ -483,6 +598,19 @@ if __name__ == "__main__":
     nyx.modules_folder = modules_folder
     nyx.servers_folder = servers_folder
     nyx.users_folder = users_folder
+    # TODO: Temp code clear
+    token = None
+    try:
+        info = open("info.nyx", "r")
+        for line in info:
+            if line.startswith("~TOKEN:"):
+                token = line[7:]
+                while token[-1:] == "\r" or token[-1:] == "\n":
+                    token = token[:-1]
+    except:
+        print("[FATAL] Unable to find or read token in info file.")
+    nyx.token = token
+    nyx.start()
 
 
 
