@@ -12,11 +12,13 @@
 # Future Tasks:
 # - Move all module code on repo to the new Nyx-Modules repo.
 # - Figure out Github API for automatic code updates?
+# - Create thread locks for certain kinds of objects possibly
 
 # Experimental Startup Parameters:
-modules_folder = "modules"
-servers_folder = "servers"
-users_folder = "users"
+modules_folder = "modulesnew"
+module_prefix = "mod"
+servers_folder = "serversnew"
+users_folder = "usersnew"
 
 ########################################################################
 # Python Libraries
@@ -47,7 +49,7 @@ class Command:
         self.function = function
         self.name = name
         self.names = []
-        self.data = {}
+        self.data = {"privilege": 1}
         if name is not None:
             self.names.append(name)
         if names is not None:
@@ -55,7 +57,7 @@ class Command:
             if name is None:
                 name = names[0]
         for key in kwargs:
-            data[key] = kwargs[key]
+            self.data[key] = kwargs[key]
 
 
 class Module:
@@ -96,14 +98,15 @@ class Module:
         return True
     
     
-    def add_command(self, function, name, **kwargs):
+    def add_command(self, function, name=None, **kwargs):
         """Adds a command to the Module listing."""
         self.remove_command(name)
-        command = Command(function, name)
+        command = Command(function, name, **kwargs)
         if command.name is None:
             return None
         self.commands.append(command)
-        self.command_map[name] = command
+        for name in command.names:
+            self.command_map[name] = command
         # self.commands.sort(key=lambda a: a.name)
         return command
     
@@ -227,6 +230,8 @@ class Nyx:
         # TODO: Group variables in some fashion.
         self.client = discord.Client()
         self.command_map = {}
+        self.command_prefixes = ["$", "~", "!", "%", "^", "&",
+                                "*", "-", "=", ".", ">", "/"]
         self.modules = []
         self.modules_folder = None
         self.module_map = {}
@@ -243,8 +248,10 @@ class Nyx:
         self.users_folder = None
         # Runtime Status
         self.debug = False
+        self.mention = None
+        self.mention2 = None
         self.ready = False
-        self.restart = False
+        self.restart = False # Option to restart after shutdown.
         self.shutdown = False
     
     
@@ -288,6 +295,8 @@ class Nyx:
         server. If such ServerData does not exist, then create a new
         object to hold data.
         """
+        if discord_server is None:
+            return None
         server = None
         # Since both Discord Server and ServerData have a string id
         # parameter, this will still be okay if ServerData is passed.
@@ -352,8 +361,7 @@ class Nyx:
             # May need to update Discord User object depending on how
             # discord.py handles the uniqueness of User objects?
             # Or if we never really instantiated the object?
-            if user.user.display_name is None:
-                user.user = discord_user
+            user.user = discord_user
         return user
     
     
@@ -416,6 +424,9 @@ class Nyx:
             return True # haha poor logical flow
         except:
             # TODO: Some error stuff
+            error = sys.exc_info()
+            for e in error:
+                print(e)
             return False
     
     
@@ -539,31 +550,65 @@ class Nyx:
     async def trigger(self, module, name, **kwargs):
         await self.client.wait_until_ready()
         if module.has_listener(name) and not await \
-            module.call_listener(name, client = self, **kwargs) is None:
+            module.call_listener(name, client=self, **kwargs) is None:
             return True
         return False
 
 
     async def trigger_modules(self, name, server=None, **kwargs):
         if server is None:
+            # TODO: Determine if all Modules should listen to DMs...
             for module in self.modules:
-                await self.trigger(module, name, server = server, **kwargs)
+                await self.trigger(module, name, server=server, **kwargs)
         else:
             imports = self.get_server_data(server).modules
             for module in self.modules:
                 if module.primary or module in imports:
-                    await self.trigger(module, name, server = server, **kwargs)
+                    await self.trigger(module, name, server=server, **kwargs)
     
     
     def connect_events(self):
-        """Sets up listeners for triggering Modules for events."""
+        """Sets up listeners for triggering Modules for events.
+        These are placed in the same order as:
+        http://discordpy.readthedocs.io/en/latest/api.html
+        except for the on_message event, which has its own separate
+        section.
+        """
         client = self.client
         
         
         @client.event
         async def on_ready():
+            self.mention = self.client.user.mention
+            self.mention2 = self.mention[0:2] + "!" + self.mention[2:]
             await self.trigger_modules("on_ready")
             print("on_ready")
+        
+        
+        @client.event
+        async def on_resumed():
+            await trigger_modules("on_resumed")
+        
+        
+        # Unknown what really is passed to on_error event??
+        @client.event
+        async def on_error(event, *args, **kwargs):
+            await trigger_modules("on_error", args=args, **kwargs)
+        
+        
+        # TODO: on_socket_raw_receive and on_socket_raw_send??
+        
+        
+        @client.event
+        async def on_message_delete(message):
+            member = None if message.server is None else message.author
+            await trigger_modules("on_message_delete", message=message,
+                    server=message.server, channel=message.channel,
+                    user=message.author, member=member)
+        
+        
+        # @client.event
+        # async def
         
         
 ########################################################################
@@ -575,9 +620,76 @@ class Nyx:
             if message.author.id == client.user.id:
                 return
             # TODO: Main on_message handling
-            print(message.content)
-
-
+            # Have all listening modules trigger on_message event.
+            server = message.server
+            server_data = self.get_server_data(server)
+            mention = self.client.user.mention
+            await self.trigger_modules("on_message", server=server,
+                                                    message=message)
+            
+            command = False
+            talk = server is None
+            # Normalize message and search for module or command call.
+            # If the bot client is mentioned at the beginning of the
+            # message, remove the mention and the bot user from the list
+            # of mentions unless the bot is mentioned more than once.
+            for user in message.mentions:
+                if user == self.client.user:
+                    print(user.mention)
+                    mention = user.mention
+                    if message.content.startswith(user.mention):
+                        talk = True
+                        message.content = message.content[len(mention):] \
+                                            .strip()
+                    # Check for a second mention before removing user.
+                    if user.mention not in message.content:
+                        message.mentions.remove(user)
+            
+            # Check to see if command type message is in place,
+            # also normalizing message by removing the prefix.
+            if talk:
+                for prefix in self.command_prefixes:
+                    if message.content.startswith(prefix):
+                        command = True
+                        message.content = message.content[len(prefix):].strip()
+                        break
+            if server_data is not None and not command:
+                for prefix in server_data.prefixes:
+                    if message.content.startswith(prefix):
+                        command = True
+                        message.content = message.content[len(prefix):].strip()
+                        break
+            
+            # Execute command if command type message.
+            # By this point, we have the following normalized format:
+            # <command or module> <command> [param1] [param2] ...
+            # e.g. unison ap stat 32 140
+            # from original command @user $unison ap stat 32 140
+            # oh, and also check of message.content is not empty...
+            if command and message.content:
+                # Priority on first keyword arg (if cmd prefix is used):
+                # First: (primary) module commands (command_map)
+                # Second: imported server module commands (if exists)
+                # Third: individual module names
+                # TODO: Change var name 'args' to understandable name?
+                args = message.content.split(" ")[0]
+                # Check for core commands or module names:
+                command = self.command_map.get(args[0], None)
+                module = self.module_map.get(args[0], None)
+                if command is None and server_data is not None:
+                    # Check for imported server commands if no core
+                    # command has been found.
+                    command = server_data.command_map.get(args[0], None)
+                if command is None and module is not None and len(args) > 1:
+                    command = module.command_map.get(args[1], None)
+            
+            # If user is known to be talking to Nyx, but no bot command
+            # was issued, then issue talk event to possible chat mods.
+            elif talk:
+                await self.trigger_modules("talk", server=server,
+                                                    message=message)
+            
+            
 ########################################################################
 # Client Startup
 ########################################################################
@@ -611,8 +723,11 @@ if __name__ == "__main__":
     print_line()
     import splashnyx # Nyx art splash
     print_line()
+    import logging
+    logging.basicConfig(level=logging.INFO)
     nyx = Nyx()
     nyx.modules_folder = modules_folder
+    nyx.module_prefix = module_prefix
     nyx.servers_folder = servers_folder
     nyx.users_folder = users_folder
     # TODO: Temp code clear
