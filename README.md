@@ -1,8 +1,16 @@
-![loli](http://vignette1.wikia.nocookie.net/unisonleague/images/8/85/Gear-Twilight_Nyx_Render.png)
 # Nyx
 ## A random Discord Bot
+
+### Installation:
+
+Coming soon?...
 
 ### To Do:
 
 - [x] Make repository
-- [ ] Do stuff
+- [ ] Finish tempnyx.py framework and move to nyx.py
+- [ ] Rewrite README.md
+- [ ] Create temp branches so I can stop pushing to master like a fool
+- [ ] Move modules to new repo possibly...
+- [ ] Finish this list
+
