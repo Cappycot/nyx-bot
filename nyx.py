@@ -826,7 +826,13 @@ async def clock():
         if last_minute != dtime.minute:
             last_minute = dtime.minute
             #print("minute tick")
-            await trigger_modules("clock", time = dtime)
+            try:
+                await trigger_modules("clock", time = dtime)
+            except:
+                error = sys.exc_info()
+                print("Error in a module's clock event!")
+                for e in error:
+                    print(e)
             
             if not statuschange:
                 await client.change_presence(game = discord.Game(name = "code rewriting..."), status = discord.Status.dnd)
