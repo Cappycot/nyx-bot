@@ -47,6 +47,7 @@ class Command:
     """
     def __init__(self, function, name, names=None, **kwargs):
         self.function = function
+        self.has_access = None
         self.name = name
         self.names = []
         self.data = {"privilege": 1}
@@ -54,24 +55,29 @@ class Command:
             self.names.append(name)
         if names is not None:
             self.names.extend(names)
-            if name is None:
-                name = names[0]
+            if self.name is None:
+                self.name = names[0]
         for key in kwargs:
             self.data[key] = kwargs[key]
+    
+    @property
+    def privilege(self):
+        return self.data["privilege"]
 
 
 class Module:
     """Holder object for a particular module that is imported into Nyx.
     The command mapping system is still a WIP.
     """
-    def __init__(self, name, folder, module=None, primary=False, **kwargs):
+    def __init__(self, name, folder, module, **_):
         self.commands = []
         self.command_map = {}
         self.disabled = False
         self.folder = folder
         self.module = module
         self.name = name
-        self.primary = primary
+        self.names = [name]
+        self.primary = False
         self.listeners = {}
     
     
@@ -161,6 +167,7 @@ class ServerData:
         """
         # TODO: Maybe change this to binary_search function to avoid
         # O(n^2) worst case not found time.
+        # Done. Now this runs in O(1) time lol.
         if module is None or module in self.modules:
             return False
         modules.append(module)
@@ -195,7 +202,12 @@ class User:
         self.data = {"privilege": 1}
         self.id = discord_user.id
         self.user = discord_user
-        
+    
+    
+    @property
+    def privilege(self):
+        return self.data["privilege"]
+    
     
     def get_privilege(self):
         return self.data["privilege"]
@@ -203,6 +215,17 @@ class User:
     
     def set_privilege(self, level):
         self.data["privilege"] = level
+    
+    
+    def has_access(self, command):
+        if command.has_access is not None:
+            return command.has_access(self)
+        if self.privilege < 0:
+            return self.privilege <= command.privilege
+        elif command.privilege > 0:
+            return self.privilege >= command.privilege
+        else:
+            return command.privilege == 0
 
 
 ########################################################################
@@ -396,7 +419,14 @@ class Nyx:
     
     
     def update_maps(self):
-        pass
+        self.command_map.clear()
+        self.module_map.clear()
+        for module in self.modules:
+            for name in module.names:
+                self.module_map[name] = module
+            if module.primary:
+                for cmdname in module.command_map:
+                    self.command_map[cmdname] = module.command_map[cmdname]
     
     
     def load_module(self, name):
@@ -407,9 +437,8 @@ class Nyx:
                 path = getcwd() + "/" + self.modules_folder + "/" + name
                 # Add folder of module to import.
                 sys.path.append(path)
-                module = Module(name, path)
-                module.module = __import__(self.mod_prefix
-                                            + name + self.mod_suffix)
+                module = Module(name, path, __import__(self.mod_prefix + name
+                                                        + self.mod_suffix))
                 # TODO: Call init on module
                 module.module.init(client=self, module=module)
                 self.modules.append(module)
@@ -417,7 +446,10 @@ class Nyx:
             elif self.debug:
                 module.module = reload(module.module)
                 # TODO: Call init on module
+                module.commands.clear()
+                module.command_map.clear()
                 module.module.init(client=self, module=module)
+                module.update_command_map()
             else:
                 return False
             self.update_maps()
@@ -520,13 +552,16 @@ class Nyx:
                 user.data[args[0]] = args[1]
             return True
         except:
+            error = sys.exc_info()
+            for e in error:
+                print(e)
             return False
     
     
     def load_users(self, users_folder=None):
         """asdf"""
         # Check if a specific folder is designated.
-        if self.users_folder is None:
+        if users_folder is not None:
             self.users_folder = users_folder
         if self.users_folder is None:
             return False
@@ -534,10 +569,11 @@ class Nyx:
         success = True
         try:
             for usrpath in listdir(path):
-                if not isfile(usrpath):
+                if not isfile(path + usrpath):
+                    print("not file")
                     continue
-                uid = str(usrpath)
-                success = self.load_user(uid) and success
+                # usrpath is the id string of a user and the filename.
+                success = self.load_user(str(usrpath)) and success
         except FileNotFoundError:
             mkdir(path)
         return success
@@ -587,13 +623,13 @@ class Nyx:
         
         @client.event
         async def on_resumed():
-            await trigger_modules("on_resumed")
+            await self.trigger_modules("on_resumed")
         
         
         # Unknown what really is passed to on_error event??
         @client.event
         async def on_error(event, *args, **kwargs):
-            await trigger_modules("on_error", args=args, **kwargs)
+            await self.trigger_modules("on_error", args=args, **kwargs)
         
         
         # TODO: on_socket_raw_receive and on_socket_raw_send??
@@ -602,13 +638,186 @@ class Nyx:
         @client.event
         async def on_message_delete(message):
             member = None if message.server is None else message.author
-            await trigger_modules("on_message_delete", message=message,
-                    server=message.server, channel=message.channel,
-                    user=message.author, member=member)
+            await self.trigger_modules("on_message_delete", message=message,
+                            server=message.server, channel=message.channel,
+                            user=message.author, member=member)
         
         
-        # @client.event
-        # async def
+        @client.event
+        async def on_message_edit(message1, message2):
+            """At this point, we're throwing a lot of kwargs in and
+            hoping something sticks to the wall... help.
+            """
+            member = None if message2.server is None else message2.author
+            await self.trigger_modules("on_message_edit", message=message2,
+                            server=message2.server, channel=message2.channel,
+                            user=message2.author, member=member,
+                            before=message1, after=message2)
+        
+        
+        @client.event
+        async def on_reaction_add(reaction, user):
+            message = reaction.message
+            member = None if message.server is None else user
+            await self.trigger_modules("on_reaction_add", message=message,
+                            server=message.server, channel=message.channel,
+                            user=user, member=member, reaction=reaction,
+                            emoji=reaction.emoji)
+        
+        @client.event
+        async def on_reaction_remove(reaction, user):
+            message = reaction.message
+            member = None if message.server is None else user
+            await self.trigger_modules("on_reaction_remove", message=message,
+                            server = message.server, channel=message.channel,
+                            user=user, member=member, reaction=reaction,
+                            emoji=reaction.emoji)
+        
+        
+        @client.event
+        async def on_reaction_clear(message, reactions):
+            message = reaction.message
+            await self.trigger_modules("on_reaction_remove", message=message,
+                            server=message.server, channel=message.channel,
+                            reactions=reactions)
+        
+        
+        @client.event
+        async def on_channel_create(channel):
+            await self.trigger_modules("on_channel_create",
+                            server=channel.server, channel=channel)
+        
+        
+        @client.event
+        async def on_channel_delete(channel):
+            await self.trigger_modules("on_channel_delete",
+                            server=channel.server, channel=channel)
+        
+        
+        @client.event
+        async def on_channel_update(channel1, channel2):
+            await self.trigger_modules("on_channel_update",
+                            server=channel.server, channel=channel2,
+                            before=channel1, after=channel2)
+        
+        
+        @client.event
+        async def on_member_join(member):
+            await self.trigger_modules("on_member_join", server=member.server,
+                            user=member, member=member)
+        
+        
+        @client.event
+        async def on_member_remove(member):
+            await self.trigger_modules("on_member_remove",
+                            server=member.server, user=member, member=member)
+        
+        
+        @client.event
+        async def on_member_update(member1, member2):
+            await self.trigger_modules("on_member_update",
+                            server=member.server, user=member, member=member2,
+                            before=member1, after=member2)
+        
+        
+        @client.event
+        async def on_server_join(server):
+            await self.trigger_modules("on_server_join", server=server)
+
+
+        @client.event
+        async def on_server_remove(server):
+            await self.trigger_modules("on_server_remove", server=server)
+
+
+        @client.event
+        async def on_server_update(server1, server2):
+            await self.trigger_modules("on_server_update", server=server2,
+                            before=server1, after=server2)
+
+
+        @client.event
+        async def on_server_role_create(role):
+            await self.trigger_modules("on_server_role_create",
+                            server=role.server, role=role)
+
+
+        @client.event
+        async def on_server_role_delete(role):
+            await self.trigger_modules("on_server_role_delete",
+                            server=role.server, role=role)
+
+
+        @client.event
+        async def on_server_role_update(role1, role2):
+            await self.trigger_modules("on_server_role_delete",
+                            server=role2.server, role = role2,
+                            before=role1, after=role2)
+
+
+        @client.event
+        async def on_server_emojis_update(list1, list2):
+            server = None
+            if len(list1) > 0:
+                server = list1[0].server
+            # TODO: Confirm the theory that either list
+            # has at least 1 emoji in it.
+            else:
+                server = list2[0].server
+            await self.trigger_modules("on_server_emojis_update",
+                            server=server, emojis=list2,
+                            before=list1, after=list2)
+
+
+        @client.event
+        async def on_server_available(server):
+            await self.trigger_modules("on_server_available", server=server)
+
+
+        @client.event
+        async def on_server_unavailable(server):
+            await self.trigger_modules("on_server_unavailable", server=server)
+
+
+        @client.event
+        async def on_voice_state_update(member1, member2):
+            await self.trigger_modules("on_voice_state_update",
+                            server = member2.server, member=member2,
+                            before=member1, after=member2)
+
+
+        @client.event
+        async def on_member_ban(member):
+            await self.trigger_modules("on_member_ban", server=member.server,
+                            user=member, member=member)
+
+
+        @client.event
+        async def on_member_unban(server, user):
+            await self.trigger_modules("on_member_unban",
+                            server=server, user=user)
+
+
+        @client.event
+        async def on_typing(channel, user, when):
+            member = None if channel.server is None else user
+            if member is not None:
+                user = member
+            await self.trigger_modules("on_typing", server=channel.server,
+                            channel=channel, user=user,
+                            member=member, time=when)
+
+
+        @client.event
+        async def on_group_join(channel, user):
+            await self.trigger_modules("on_group_join",
+                            channel=channel, user=user)
+
+
+        @client.event
+        async def on_group_remove(channel, user):
+            await self.trigger_modules("on_group_remove",
+                            channel=channel, user=user)
         
         
 ########################################################################
@@ -635,7 +844,6 @@ class Nyx:
             # of mentions unless the bot is mentioned more than once.
             for user in message.mentions:
                 if user == self.client.user:
-                    print(user.mention)
                     mention = user.mention
                     if message.content.startswith(user.mention):
                         talk = True
@@ -672,16 +880,38 @@ class Nyx:
                 # Second: imported server module commands (if exists)
                 # Third: individual module names
                 # TODO: Change var name 'args' to understandable name?
-                args = message.content.split(" ")[0]
+                args = message.content.lower().split(" ")
                 # Check for core commands or module names:
                 command = self.command_map.get(args[0], None)
                 module = self.module_map.get(args[0], None)
+                
                 if command is None and server_data is not None:
                     # Check for imported server commands if no core
                     # command has been found.
                     command = server_data.command_map.get(args[0], None)
                 if command is None and module is not None and len(args) > 1:
                     command = module.command_map.get(args[1], None)
+                
+                # Execute command and send output message if exists.
+                if command is not None:
+                    output = None
+                    user = self.get_user(message.author)
+                    if user.has_access(command):
+                        output = await command.function(client=self.client,
+                                                    message=message,
+                                                    nyx=self)
+                    elif server is None:
+                        output = "You do not have access to that command."
+                    if output is not None:
+                        output = str(output)
+                        if server is not None:
+                            output = message.author.mention + ", " + output
+                        await client.send_message(message.channel, output)
+                
+                # Trigger module help event.
+                elif module is not None:
+                    await self.trigger(module, "help", server=server,
+                                                    message=message)
             
             # If user is known to be talking to Nyx, but no bot command
             # was issued, then issue talk event to possible chat mods.
@@ -691,11 +921,45 @@ class Nyx:
             
             
 ########################################################################
+# Main Background Clock
+########################################################################
+
+    async def clock(self):
+        print("Main background clock created.")
+        await self.client.wait_until_ready()
+        last_minute = -1
+        while not self.shutdown:
+            await asyncio.sleep(1)
+            dtime = datetime.now()
+            if last_minute != dtime.minute:
+                last_minute = dtime.minute
+                #print("minute tick")
+                for module in self.modules:
+                    try:
+                        await self.trigger(module, "clock",
+                                        server=None, time=dtime)
+                    except:
+                        # TODO: Handle individual module clock error.
+                        pass
+        
+        print("The system is going down now!")
+        await asyncio.sleep(1)
+        print("Logging out of Discord...")
+        await self.client.change_presence(game = \
+                                discord.Game(name = "shutdown..."),
+                                            status = discord.Status.idle)
+        await asyncio.sleep(1)
+        print("Here's your gold. Goodbye.")
+        await self.client.logout()
+
+
+########################################################################
 # Client Startup
 ########################################################################
 
     def start(self):
         self.connect_events()
+        self.client.loop.create_task(self.clock())
         self.client.run(self.token)
         print("ended")
 
