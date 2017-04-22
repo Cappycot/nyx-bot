@@ -874,6 +874,8 @@ def on_ready():
 # Startup
 ########################################################################
 
+from time import sleep
+
 def start():
     print_line()
     import splashnyx # Nyx art splash
@@ -888,8 +890,16 @@ def start():
         print("[FATAL] Something failed while loading users!")
         sys.exit(0)
     print_line()
-    client.loop.create_task(clock())
-    client.run(token)
+    global shutdown
+    while True:
+        client.loop.create_task(clock())
+        client.run(token)
+        print("Loop. Shutdown: " + str(shutdown))
+        if shutdown:
+            break
+        shutdown = True
+        sleep(3)
+        shutdown = False
 
 
 if __name__ == "__main__":

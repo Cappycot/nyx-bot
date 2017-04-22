@@ -391,6 +391,7 @@ async def clock(client, time):
     for ar in ap_reminders:
         if ar[0] == stamp:
             to_remind = discord.User(id = ar[1])
+            print("Attempting to send reminder to " + ar[1])
             await client.send_message(to_remind, "Umm... " + ar[2] + ", your AP is almost full by now.")
             del_ap_reminders.append(ar)
         else:
@@ -410,6 +411,7 @@ async def clock(client, time):
                 to_remind = discord.User(id = user.id)
                 for event in reminders.events:
                     remind_message += "\n - " + get_full_name(event)
+                print("Attempting to send reminder to " + user.id)
                 await client.send_message(to_remind, remind_message)
 
 
