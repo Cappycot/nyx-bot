@@ -57,13 +57,14 @@ def locate_numbers(string):
     indicating that the victim has accidentally turned a number into
     its factorial.
     """
-    raw_results = findall("[ ]+[\-]?.[0-9]*![?,.]*", " " + string)
+    raw_results = findall("[ /]+[\-]?.[0-9]*![?,.]*", " " + string)
     results = []
     for result in raw_results:
         prefix = ""
         result = result.strip()[:-1]
         while match("[0-9]", result) is None:
-            prefix += result[:1]
+            if result[:1] != "/":
+                prefix += result[:1]
             result = result[1:]
         while search("[0-9]$", result) is None:
             result = result[:-1]
@@ -125,9 +126,9 @@ def init(module=None, **_):
 
 # Testing functions...
 if __name__ == "__main__":
-    print(locate_numbers("It's over 9000!"))
-    test = int("9" * 100)
-    print(get_factorial(["$", test]))
+    test = locate_numbers("I rate it 10/10!!!")
+    print(test)
+    print(get_factorial(test[0]))
 
 
 
