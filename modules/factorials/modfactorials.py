@@ -86,10 +86,11 @@ async def help(client=None, message=None, server=None, **_):
     await client.send_message(message.channel, msg)
 
 
-async def on_message(client=None, message=None, server=None, **_):
+async def on_message(client=None, message=None, **_):
     if client is None or message is None:
         return
     nums = locate_numbers(message.content)
+    server = message.server
     if len(nums) > 0:
         # So apparently message.author.nick has a chance to be None...
         ohno = "You've uttered "
@@ -114,12 +115,12 @@ async def on_message(client=None, message=None, server=None, **_):
 def init(module=None, **_):
     if module is None:
         return False
-    module.primary = True
-    module.add_listener(help, "help")
-    module.add_listener(on_message, "on_message")
-    module.add_name("factorial")
-    module.add_name("factoral")
-    module.add_name("factorals")
+    module.make_primary()
+    # module.add_listener(help, "help")
+    module.set_listener(on_message, "on_message")
+    # module.add_name("factorial")
+    # module.add_name("factoral")
+    # module.add_name("factorals")
     return True
 
 
