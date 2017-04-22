@@ -81,6 +81,18 @@ class Module:
         self.listeners = {}
     
     
+    def add_command(self, function, name=None, **kwargs):
+        """Adds a command to the Module listing."""
+        self.remove_command(name)
+        command = Command(function, name, **kwargs)
+        if command.name is None:
+            return None
+        self.commands.append(command)
+        for name in command.names:
+            self.command_map[name] = command
+        # self.commands.sort(key=lambda a: a.name)
+        return command
+    
     def update_command_map(self):
         """Probably-costly operation to reset the command_map and
         map each Command name to the Command itself to allow for
@@ -104,19 +116,6 @@ class Module:
         return True
     
     
-    def add_command(self, function, name=None, **kwargs):
-        """Adds a command to the Module listing."""
-        self.remove_command(name)
-        command = Command(function, name, **kwargs)
-        if command.name is None:
-            return None
-        self.commands.append(command)
-        for name in command.names:
-            self.command_map[name] = command
-        # self.commands.sort(key=lambda a: a.name)
-        return command
-    
-    
     # Listeners triggered in the Discord client will call these if
     # there exists a listener with a matching event name.
     def add_listener(self, function, name):
@@ -131,9 +130,6 @@ class Module:
         self.listeners[name] = function
     
     
-    
-    
-    
     def has_listener(self, name):
         """Checks to see if event listener is designated for a name."""
         return name in self.listeners
@@ -142,6 +138,11 @@ class Module:
     async def call_listener(self, name, **kwargs):
         """asdf"""
         return await self.listeners[name](**kwargs)
+    
+    
+    def add_name(self, name):
+        if name not in self.names:
+            self.names.append(name)
 
 
 class ServerData:
