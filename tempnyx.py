@@ -119,11 +119,19 @@ class Module:
     
     # Listeners triggered in the Discord client will call these if
     # there exists a listener with a matching event name.
+    def add_listener(self, function, name):
+        """Designate a function to be called upon a certain event
+        name.
+        """
+        self.listeners[name] = function
     def set_listener(self, function, name):
         """Designate a function to be called upon a certain event
         name.
         """
         self.listeners[name] = function
+    
+    
+    
     
     
     def has_listener(self, name):
@@ -440,7 +448,8 @@ class Nyx:
                 module = Module(name, path, __import__(self.mod_prefix + name
                                                         + self.mod_suffix))
                 # TODO: Call init on module
-                module.module.init(client=self, module=module)
+                if not module.module.init(client=self, module=module):
+                    return False
                 self.modules.append(module)
                 self.modules.sort(key=lambda a:a.name)
             elif self.debug:
@@ -448,7 +457,9 @@ class Nyx:
                 # TODO: Call init on module
                 module.commands.clear()
                 module.command_map.clear()
-                module.module.init(client=self, module=module)
+                if not module.module.init(client=self,
+                                            module=module, nyx=self):
+                    return False
                 module.update_command_map()
             else:
                 return False
@@ -586,7 +597,8 @@ class Nyx:
     async def trigger(self, module, name, **kwargs):
         await self.client.wait_until_ready()
         if module.has_listener(name) and not await \
-            module.call_listener(name, client=self, **kwargs) is None:
+            module.call_listener(name, client=self.client,
+                                nyx=self, **kwargs) is None:
             return True
         return False
 
