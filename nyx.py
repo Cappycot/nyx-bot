@@ -16,6 +16,8 @@
 import asyncio
 from datetime import datetime
 import discord
+import logging
+logging.basicConfig(level=logging.INFO)
 from importlib import reload
 from os import getcwd, listdir, mkdir
 from os.path import isfile
@@ -806,6 +808,7 @@ async def on_message(message):
 # Run the clock function on each module.
 # Get a list of messages to send and forward all of those at once.
 
+killswitch = False
 @client.event
 async def clock():
     print("Main background clock created.")
@@ -825,7 +828,7 @@ async def clock():
         dtime = datetime.now()
         if last_minute != dtime.minute:
             last_minute = dtime.minute
-            #print("minute tick")
+            print("minute tick")
             try:
                 await trigger_modules("clock", time = dtime)
             except:
@@ -845,11 +848,9 @@ async def clock():
     await asyncio.sleep(1)
     print("Here's your gold. Goodbye.")
     await client.logout()
-    if not save_servers():
-        print("[FATAL] Something failed while saving servers!")
-    if not save_users():
-        print("[FATAL] Something failed while saving users!")
     print_line()
+    global killswitch
+    killswitch = True
 
 
 ########################################################################
@@ -876,6 +877,11 @@ def on_ready():
 
 from time import sleep
 
+async def main():
+    await client.login(token)
+    await client.connect()
+
+
 def start():
     print_line()
     import splashnyx # Nyx art splash
@@ -890,16 +896,31 @@ def start():
         print("[FATAL] Something failed while loading users!")
         sys.exit(0)
     print_line()
+    client.loop.create_task(clock())
+    
     global shutdown
-    while True:
-        client.loop.create_task(clock())
-        client.run(token)
-        print("Loop. Shutdown: " + str(shutdown))
-        if shutdown:
-            break
-        shutdown = True
-        sleep(3)
-        shutdown = False
+    global killswitch
+    while not killswitch:
+        try:
+            if not shutdown:
+                client.loop.run_until_complete(main())
+            else:
+                client.loop.run_until_complete(asyncio.sleep(1))
+        except KeyboardInterrupt:
+            print("Killed.")
+            shutdown = True
+        except:
+            if shutdown:
+                break
+    
+    if not save_servers():
+        print("[FATAL] Something failed while saving servers!")
+    else:
+        print("Saved servers.")
+    if not save_users():
+        print("[FATAL] Something failed while saving users!")
+    else:
+        print("Saved users.")
 
 
 if __name__ == "__main__":
