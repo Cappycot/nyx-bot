@@ -691,8 +691,9 @@ async def on_member_unban(server, user):
 
 @client.event
 async def on_typing(channel, user, when):
+    server = None if channel.is_private else channel.server
     member = None if channel.server is None else user
-    await trigger_modules("on_typing", server = channel.server, channel = channel, user = user, member = member, time = when)
+    await trigger_modules("on_typing", server = server, channel = channel, user = user, member = member, time = when)
 
 
 @client.event

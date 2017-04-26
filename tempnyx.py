@@ -284,7 +284,7 @@ class Nyx:
         self.mention = None
         self.mention2 = None
         self.ready = False
-        self.restart = False # Option to restart after shutdown.
+        self.restart = False    # Option to restart after shutdown.
         self.shutdown = False
         # Don't Touch:
         self.safe_to_shutdown = False
@@ -468,7 +468,7 @@ class Nyx:
             else:
                 return False
             self.update_maps()
-            return True # haha poor logical flow
+            return True     # haha poor logical flow
         except:
             # TODO: Some error stuff
             error = sys.exc_info()
@@ -552,7 +552,7 @@ class Nyx:
             user = None
             if id in self.users:
                 user = self.users[id]
-            else: # Force creation of new User object.
+            else:   # Force creation of new User object.
                 placeholder = discord.User()
                 placeholder.id = id
                 user = self.get_user(placeholder)
@@ -645,12 +645,18 @@ class Nyx:
         
         
         # Unknown what really is passed to on_error event??
+        # For now, modules can't subscribe to it...
         @client.event
         async def on_error(event, *args, **kwargs):
-            await self.trigger_modules("on_error", args=args, **kwargs)
+            print("Error encountered! (" + str(event) + ")")
+            for a in args:
+                print(str(a))
+            for key in kwargs:
+                print(key + " - " + kwargs[key])
         
         
-        # TODO: on_socket_raw_receive and on_socket_raw_send??
+        # This is where on_socket_raw_receive and on_socket_raw_send
+        # would be, but I don't think anyone would care.
         
         
         @client.event
@@ -818,10 +824,11 @@ class Nyx:
 
         @client.event
         async def on_typing(channel, user, when):
+            server = None if channel.is_private else channel.server
             member = None if channel.server is None else user
             if member is not None:
                 user = member
-            await self.trigger_modules("on_typing", server=channel.server,
+            await self.trigger_modules("on_typing", server=server,
                             channel=channel, user=user,
                             member=member, time=when)
 
@@ -886,13 +893,13 @@ class Nyx:
                         message.content = message.content[len(prefix):].strip()
                         break
             
-            # Execute command if command type message.
+            # Execute command from non-bot if command type message.
             # By this point, we have the following normalized format:
             # <command or module> <command> [param1] [param2] ...
             # e.g. unison ap stat 32 140
             # from original command @user $unison ap stat 32 140
             # oh, and also check of message.content is not empty...
-            if command and message.content:
+            if command and message.content and not message.author.bot:
                 # Priority on first keyword arg (if cmd prefix is used):
                 # First: (primary) module commands (command_map)
                 # Second: imported server module commands (if exists)
