@@ -825,7 +825,7 @@ class Nyx:
         @client.event
         async def on_typing(channel, user, when):
             server = None if channel.is_private else channel.server
-            member = None if channel.server is None else user
+            member = None if server is None else user
             if member is not None:
                 user = member
             await self.trigger_modules("on_typing", server=server,
