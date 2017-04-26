@@ -262,6 +262,7 @@ class Nyx:
         # TODO: Group variables in some fashion.
         self.client = discord.Client()
         self.command_map = {}
+        # Default command prefixes that can be overwritten...
         self.command_prefixes = ["$", "~", "!", "%", "^", "&",
                                 "*", "-", "=", ".", ">", "/"]
         self.modules = []
@@ -285,6 +286,8 @@ class Nyx:
         self.ready = False
         self.restart = False # Option to restart after shutdown.
         self.shutdown = False
+        # Don't Touch:
+        self.safe_to_shutdown = False
     
     
     def loadstring(self, code, **kwargs):
@@ -596,6 +599,8 @@ class Nyx:
 ########################################################################
 
     async def trigger(self, module, name, **kwargs):
+        if self.shutdown:
+            return False
         await self.client.wait_until_ready()
         if module.has_listener(name) and not await \
             module.call_listener(name, client=self.client,
@@ -710,7 +715,7 @@ class Nyx:
         @client.event
         async def on_channel_update(channel1, channel2):
             await self.trigger_modules("on_channel_update",
-                            server=channel.server, channel=channel2,
+                            server=channel2.server, channel=channel2,
                             before=channel1, after=channel2)
         
         
@@ -729,8 +734,8 @@ class Nyx:
         @client.event
         async def on_member_update(member1, member2):
             await self.trigger_modules("on_member_update",
-                            server=member.server, user=member, member=member2,
-                            before=member1, after=member2)
+                            server=member2.server, user=member2,
+                            member=member2, before=member1, after=member2)
         
         
         @client.event
@@ -918,7 +923,8 @@ class Nyx:
                     if output is not None:
                         output = str(output)
                         if server is not None:
-                            output = message.author.mention + ", " + output
+                            name = message.author.nick or message.author.name
+                            output = name + ", " + output
                         await client.send_message(message.channel, output)
                 
                 # Trigger module help event.
@@ -967,14 +973,33 @@ class Nyx:
 
 
 ########################################################################
-# Client Startup
+# Client Main Loop with Startup
 ########################################################################
+# TODO: Refer to:
+# http://discordpy.readthedocs.io/en/latest/migrating.html
 
+    async def main(self):
+        await self.client.login(self.token)
+        await self.client.connect()
+
+    
     def start(self):
         self.connect_events()
         self.client.loop.create_task(self.clock())
-        self.client.run(self.token)
-        print("ended")
+        while True:
+            try:
+                if not self.shutdown:
+                    self.client.loop.run_until_complete(self.main())
+                else:
+                    self.client.loop.run_until_complete(asyncio.sleep(1))
+            except KeyboardInterrupt:
+                print("Killed.")
+                self.shutdown = True
+            except:
+                if self.shutdown:
+                    break
+        self.client.loop.run_until_complete(self.client.logout())
+        self.client.loop.close()
 
 
 ########################################################################
@@ -985,6 +1010,14 @@ line_thing = "-" * 80
 
 def print_line():
     print(line_thing)
+
+
+async def testclock():
+    min_lasted = 0
+    while True:
+        await asyncio.sleep(60)
+        min_lasted += 1
+        print("Minutes survived: " + str(min_lasted))
 
 
 # Default startup sequence if this .py file is run.
@@ -1022,6 +1055,7 @@ if __name__ == "__main__":
     nyx.load_servers_data()
     nyx.load_users()
     nyx.token = token
+    nyx.client.loop.create_task(testclock())
     nyx.start()
 
 

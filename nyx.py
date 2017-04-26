@@ -554,7 +554,11 @@ async def on_resumed():
 
 @client.event
 async def on_error(event, *args, **kwargs):
-    await trigger_modules("on_error", args = args, **kwargs)
+    print("Error encountered! (" + str(event) + ")")
+    for a in args:
+        print(str(a))
+    for key in kwargs:
+        print(key + " - " + kwargs[key])
 
 
 @client.event
@@ -616,7 +620,7 @@ async def on_member_remove(member):
 
 @client.event
 async def on_member_update(member1, member2):
-    await trigger_modules("on_member_update", server = member.server, user = member, member = [member1, member2])
+    await trigger_modules("on_member_update", server = member2.server, user = member2, member = [member1, member2])
 
 
 @client.event
@@ -838,8 +842,11 @@ async def clock():
                     print(e)
             
             if not statuschange:
-                await client.change_presence(game = discord.Game(name = "code rewriting..."), status = discord.Status.dnd)
-                statuschange = True
+                try:
+                    await client.change_presence(game = discord.Game(name = "code rewriting..."), status = discord.Status.dnd)
+                    statuschange = True
+                except:
+                    print("Status change failed; will try again.")
         
     print("The system is going down now!")
     await asyncio.sleep(1)
@@ -910,6 +917,9 @@ def start():
             print("Killed.")
             shutdown = True
         except:
+            error = sys.exc_info()
+            for e in error:
+                print(e)
             if shutdown:
                 break
     
