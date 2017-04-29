@@ -90,8 +90,8 @@ ENV/
 
 # Nyx Data
 *.nyx
-serversnew/
-usersnew/
+servers/
+users/
 
 # AWS Items
 *.pem

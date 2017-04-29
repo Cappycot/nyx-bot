@@ -57,13 +57,14 @@ def locate_numbers(string):
     indicating that the victim has accidentally turned a number into
     its factorial.
     """
-    raw_results = findall("[ ]+[\-]?.[0-9]*![?,.]*", " " + string)
+    raw_results = findall("[ /]+[\-]?.[0-9]*![?,.]*", " " + string)
     results = []
     for result in raw_results:
         prefix = ""
         result = result.strip()[:-1]
         while match("[0-9]", result) is None:
-            prefix += result[:1]
+            if result[:1] != "/":
+                prefix += result[:1]
             result = result[1:]
         while search("[0-9]$", result) is None:
             result = result[:-1]
@@ -86,11 +87,10 @@ async def help(client=None, message=None, server=None, **_):
     await client.send_message(message.channel, msg)
 
 
-async def on_message(client=None, message=None, **_):
+async def on_message(client=None, message=None, server=None, **_):
     if client is None or message is None:
         return
     nums = locate_numbers(message.content)
-    server = message.server
     if len(nums) > 0:
         # So apparently message.author.nick has a chance to be None...
         ohno = "You've uttered "
@@ -115,20 +115,20 @@ async def on_message(client=None, message=None, **_):
 def init(module=None, **_):
     if module is None:
         return False
-    module.make_primary()
-    # module.add_listener(help, "help")
-    module.set_listener(on_message, "on_message")
-    # module.add_name("factorial")
-    # module.add_name("factoral")
-    # module.add_name("factorals")
+    module.primary = True
+    module.add_listener(help, "help")
+    module.add_listener(on_message, "on_message")
+    module.add_name("factorial")
+    module.add_name("factoral")
+    module.add_name("factorals")
     return True
 
 
 # Testing functions...
 if __name__ == "__main__":
-    print(locate_numbers("It's over 9000!"))
-    test = int("9" * 100)
-    print(get_factorial(["$", test]))
+    test = locate_numbers("I rate it 10/10!!!")
+    print(test)
+    print(get_factorial(test[0]))
 
 
 
