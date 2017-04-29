@@ -17,7 +17,7 @@ import asyncio
 from datetime import datetime
 import discord
 import logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 from importlib import reload
 from os import getcwd, listdir, mkdir
 from os.path import isfile
@@ -713,7 +713,7 @@ async def on_group_remove(channel, user):
 # Check primary module event then command list.
 @client.event
 async def on_message(message):
-    if message.author.id == client.user.id:
+    if message.author.bot or message.author.id == client.user.id:
         return
     server = message.server
     #if server:
@@ -721,20 +721,11 @@ async def on_message(message):
     #print(message.author)
     #print(message.content)
     
-    responded = False
-    for module in primary_modules:
-        responded = await trigger(module, "on_message", server = server, message = message)
-    if responded:
-        return
-    
-    if message.content and server:
-        server = binary_search(servers, server.id, lambda a: a.id)
-        if server:
-            for module in modules:
-                if not module in primary_modules and module in server.modules:
-                    responded = await trigger(module, "on_message", message = message)
-    if responded:
-        return
+    name = message.author.name
+    if server is not None:
+        name = message.author.nick or message.author.name
+        print("Server: {0} ({1})".format(server.name, server.id))
+    print("From {0} ({1}): {2}".format(message.author, name, message.content))
     
     # global mention
     server = message.server # temp fix

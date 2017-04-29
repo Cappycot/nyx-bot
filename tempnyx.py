@@ -976,7 +976,7 @@ class Nyx:
                                             status = discord.Status.idle)
         await asyncio.sleep(1)
         print("Here's your gold. Goodbye.")
-        await self.client.logout()
+        self.safe_to_shutdown = True
 
 
 ########################################################################
@@ -993,7 +993,7 @@ class Nyx:
     def start(self):
         self.connect_events()
         self.client.loop.create_task(self.clock())
-        while True:
+        while not self.safe_to_shutdown:
             try:
                 if not self.shutdown:
                     self.client.loop.run_until_complete(self.main())
@@ -1005,6 +1005,7 @@ class Nyx:
             except:
                 if self.shutdown:
                     break
+        safe_to_shutdown = False
         self.client.loop.run_until_complete(self.client.logout())
         self.client.loop.close()
 

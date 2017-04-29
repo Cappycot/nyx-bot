@@ -5,7 +5,7 @@
 import asyncio
 import io
 import os
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import urllib3
 from sys import exc_info
 
@@ -17,7 +17,7 @@ testdir = None
 # Command Functions
 ###############################################################################
 
-async def fear(client = None, message = None, **_):
+async def fear(client=None, message=None, **_):
     """Concept test of PIL usage and image editing..."""
     
     # Check to make sure everything is there.
@@ -54,6 +54,7 @@ async def fear(client = None, message = None, **_):
         # Move pointer to beginning so Discord can read pic.
         testpic.seek(0) 
         await client.send_file(message.channel, testpic, filename = "nofearonefear.png")
+        return "We are all very afraid..."
     except:
         err = exc_info()
         for e in err:
@@ -61,7 +62,64 @@ async def fear(client = None, message = None, **_):
         return "Uhh... something went wrong..."
 
 
-async def obliterate(client = None, message = None, **_):
+async def flirt(client=None, message=None, **_):
+    """Concept test of PIL ImageDraw text features..."""
+    
+    # Check to make sure everything is there.
+    if client is None or message is None:
+        return "Something wrong happened idk."
+    
+    text = None
+    try:
+        text = message.content.split(" ", 1)[1].strip()
+        if len(text) > 100:
+            return "Your text is too long!"
+        elif "\n" in text:
+            return "You can't have multiple lines!"
+    except:
+        return "What?"
+    
+    text = text.split(" ")
+    flirtfont = ImageFont.truetype(testdir + "/animeace2_reg.ttf", 16)
+    append = None
+    width = 224     # height bound is about 108
+    xstart = 18
+    ycur = 360  # ystart
+    ypad = 4
+
+    try:
+        await client.send_typing(message.channel)
+        img = Image.open(testdir + "/flirtblank.png")
+        draw = ImageDraw.Draw(img)
+
+        for word in text:
+            if append is None:
+                append = word
+            else:
+                prev = append
+                append += " " + word
+                w, h = draw.textsize(append, font=flirtfont)
+                if w > width:
+                    append = word
+                    draw.text((xstart, ycur), prev, fill=(0, 0, 0), font=flirtfont)
+                    ycur += h + ypad
+        draw.text((xstart, ycur), append, fill=(0, 0, 0), font=flirtfont)
+        
+        # Save in-memory filestream and send to Discord
+        testpic = io.BytesIO()
+        img.save(testpic, format="png")
+        # Move pointer to beginning so Discord can read pic.
+        testpic.seek(0) 
+        await client.send_file(message.channel, testpic, filename = "flirt.png")
+        return "*Flirt flirt...*"
+    except:
+        err = exc_info()
+        for e in err:
+            print(e)
+        return "Uhh... something went wrong..."
+    
+
+async def obliterate(client=None, message=None, **_):
     """Concept test of PIL usage and image editing..."""
     
     # Check to make sure everything is there.
@@ -141,8 +199,9 @@ async def obliterate(client = None, message = None, **_):
         return "Uhh... we misfired, sir!"
 
 
-commands = [[["fear"], fear, "When you or someone else is scary.", "fear [@user]", -1],
-            [["obliterate", "destroy", "pwn"], obliterate, "Reks a user.", "obliterate @user", -1]]
+commands = [[["fear"], fear, "When you or someone else is scary.", "fear [@user]", 1],
+            [["flirt"], flirt, "Generates the pickup line as fire in comic.", "flirt <text>", 1],
+            [["obliterate", "destroy", "pwn"], obliterate, "Reks a user.", "obliterate @user", 1]]
 
 
 def init(module = None, **_):
