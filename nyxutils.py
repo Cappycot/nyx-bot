@@ -1,3 +1,6 @@
+########################################################################
+# Startup
+########################################################################
 
 # Binary search with lambda parameter
 def binary_search(array, query, key = lambda a: a, start = 0, end = -1):
@@ -25,7 +28,7 @@ def binary_search(array, query, key = lambda a: a, start = 0, end = -1):
     # print(mid)
     
     # mid = int(len(array) / 2)
-    compare_to = key(array[mid]) # Applies lambda to array items.
+    compare_to = key(array[mid])    # Applies lambda to array items.
     if query < compare_to:
         return binary_search(array, query, key, start, mid)
     elif query > compare_to:
@@ -58,6 +61,12 @@ def list_string(alist, key = lambda a: a):
     return result
 
 
+line_thing = "-" * 80
+# Print a line of 80 dashes
+def print_line():
+    print(line_thing)
+
+
 # Prunes Discord bots from a list of users
 def remove_bots(alist, key = lambda a: a):
     i = 0
@@ -66,3 +75,20 @@ def remove_bots(alist, key = lambda a: a):
             alist.remove(alist[i])
         else:
             i += 1
+
+
+def trim(string):
+    """Removes all carriage returns, newlines, and spaces from the
+    target string. Not sure how much this operation costs.
+    """
+    while string[-1:] == "\r" or string[-1:] == "\n":
+        string = string[:-1].strip()
+    return string
+
+
+
+
+
+
+
+

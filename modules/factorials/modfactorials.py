@@ -14,7 +14,7 @@ max_mentions = 8
 
 
 ########################################################################
-# /r/unexpectedfactorial
+# Factorial Functions
 ########################################################################
 
 def get_factorial(figure):
@@ -74,7 +74,7 @@ def locate_numbers(string):
 
 
 ########################################################################
-# /r/unexpectedfactorial
+# Listener Functions
 ########################################################################
 
 async def help(client=None, message=None, server=None, **_):
@@ -88,8 +88,6 @@ async def help(client=None, message=None, server=None, **_):
 
 
 async def on_message(client=None, message=None, server=None, **_):
-    if client is None or message is None:
-        return
     nums = locate_numbers(message.content)
     if len(nums) > 0:
         # So apparently message.author.nick has a chance to be None...
@@ -111,6 +109,10 @@ async def on_message(client=None, message=None, server=None, **_):
             ohno += "\nand others..."
         await client.send_message(message.channel, ohno)
 
+
+########################################################################
+# Module Functions
+########################################################################
 
 def init(module=None, **_):
     if module is None:

@@ -93,6 +93,9 @@ ENV/
 servers/
 users/
 
+# Frick PyCharm
+.idea/
+
 # AWS Items
 *.pem
 *.sh
