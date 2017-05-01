@@ -1,7 +1,3 @@
-########################################################################
-# Startup
-########################################################################
-
 # Binary search with lambda parameter
 def binary_search(array, query, key = lambda a: a, start = 0, end = -1):
     """Python's 'in' keyword performs a linear search on arrays.
