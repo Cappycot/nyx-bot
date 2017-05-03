@@ -183,7 +183,7 @@ class ServerData:
         # Done. Now this runs in O(1) time lol.
         if module is None or module.primary or module in self.modules:
             return False
-        modules.append(module)
+        self.modules.append(module)
         for cmdname in module.command_map:
             self.command_map[cmdname] = module.command_map[cmdname]
         return True
@@ -566,9 +566,9 @@ class Nyx:
             mkdir(path)
         return success
 
-    ########################################################################
+    ####################################################################
     # Client Events
-    ########################################################################
+    ####################################################################
 
     async def trigger(self, module, name, **kwargs):
         if self.shutdown:
@@ -660,7 +660,6 @@ class Nyx:
 
         @client.event
         async def on_reaction_clear(message, reactions):
-            message = reaction.message
             await self.trigger_modules("on_reaction_remove", message=message,
                                        server=message.server, channel=message.channel,
                                        reactions=reactions)
@@ -783,9 +782,9 @@ class Nyx:
             await self.trigger_modules("on_group_remove",
                                        channel=channel, user=user)
 
-        ########################################################################
+        ################################################################
         # Main Message Event
-        ########################################################################
+        ################################################################
 
         @client.event
         async def on_message(message):
@@ -795,7 +794,6 @@ class Nyx:
             # Have all listening modules trigger on_message event.
             server = message.server
             server_data = self.get_server_data(server)
-            mention = self.client.user.mention
             await self.trigger_modules("on_message", server=server,
                                        message=message)
 
@@ -882,7 +880,6 @@ class Nyx:
             elif talk:
                 await self.trigger_modules("talk", server=server,
                                            message=message)
-
 
                 ########################################################################
                 # Main Background Clock
