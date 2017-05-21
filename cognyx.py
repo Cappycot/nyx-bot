@@ -63,18 +63,21 @@ class UserData:
         self.data["privilege"] = level
 
 
-def check_prefix(nyx, message):
+def check_prefix(bot, message):
+    """If a server has no specified custom prefixes, Nyx will use her
+    mention appended before each of her default prefixes.
+    """
     if message.server is not None:
-        server_prefixes = nyx.get_server_data(message.server).prefixes
+        server_prefixes = bot.get_server_data(message.server).prefixes
         if len(server_prefixes) > 0:
             return server_prefixes
         else:
-            mention = message.server.get_member(nyx.user.id).mention
+            mention = message.server.get_member(bot.user.id).mention
             at_prefixes = []
-            for prefix in nyx.prefixes:
+            for prefix in bot.prefixes:
                 at_prefixes.append(mention + " " + prefix)
             return at_prefixes
-    return nyx.prefixes
+    return bot.prefixes
 
 
 class Nyx(commands.Bot):
@@ -229,7 +232,7 @@ class Nyx(commands.Bot):
                         # this is to prevent confusion to cogs that expect
                         # the format <prefix> <command> <content>
                         omit = message.content.index(invoker)
-                        message.content = message.content[:omit] + message.content[omit + len(invoker):].strip()
+                        message.content = message.content[:omit].strip() + message.content[omit + len(invoker):].strip()
 
         if command is not None:
             self.dispatch("command", command, ctx)
@@ -259,4 +262,4 @@ if __name__ == "__main__":
         print(basename(nyx.commands[key].module.__file__))
     print("...")
 
-    nyx.run("MjY0NTQyNTg5NzU4MzQxMTIw.C0iGAA.o_wNq4yiztxiddRZUHxissXGdpw")
+    nyx.run("")
