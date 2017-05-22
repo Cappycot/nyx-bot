@@ -1,3 +1,3 @@
-import cognyx
+import nyx
 
 print("Test multiple clients...")

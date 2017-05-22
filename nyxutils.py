@@ -1,5 +1,4 @@
-# Binary search with lambda parameter
-def binary_search(array, query, key = lambda a: a, start = 0, end = -1):
+def binary_search(array, query, key=lambda a: a, start=0, end=-1):
     """Python's 'in' keyword performs a linear search on arrays.
     Given the circumstances of storing sorted arrays, it's better
     for Nyx to use a binary search.
@@ -11,20 +10,20 @@ def binary_search(array, query, key = lambda a: a, start = 0, end = -1):
     """
     if array is None or len(array) == 0:
         return None
-    # elif len(array) == 1:
+        # elif len(array) == 1:
         # return key(array[0]) == query and array[0] or None
-    
+
     if end == -1:
         end = len(array)
     elif start >= end:
         return None
-    
+
     # print(start, "and", end)
     mid = int(start + (end - start) / 2)
     # print(mid)
-    
+
     # mid = int(len(array) / 2)
-    compare_to = key(array[mid])    # Applies lambda to array items.
+    compare_to = key(array[mid])  # Applies lambda to array items.
     if query < compare_to:
         return binary_search(array, query, key, start, mid)
     elif query > compare_to:
@@ -34,11 +33,9 @@ def binary_search(array, query, key = lambda a: a, start = 0, end = -1):
 
 
 # Prints a list in legible format
-def list_string(alist, key = lambda a: a):
+def list_string(alist, key=lambda a: a):
     """Given items a, b, ..., x, y, z in an array,
     this will print "a, b, ..., x, y and z"
-    
-    
     """
     if len(alist) == 0:
         return "[empty]"
@@ -57,14 +54,13 @@ def list_string(alist, key = lambda a: a):
     return result
 
 
-line_thing = "-" * 80
-# Print a line of 80 dashes
 def print_line():
-    print(line_thing)
+    """Print a line of 80 dashes."""
+    print("-" * 80)
 
 
-# Prunes Discord bots from a list of users
-def remove_bots(alist, key = lambda a: a):
+def remove_bots(alist, key=lambda a: a):
+    """Prunes Discord bots from a list of users."""
     i = 0
     while i < len(alist):
         if key(alist[i]).bot:
@@ -80,11 +76,3 @@ def trim(string):
     while string[-1:] == "\r" or string[-1:] == "\n":
         string = string[:-1].strip()
     return string
-
-
-
-
-
-
-
-

@@ -1,153 +1,34 @@
-########################################################################
-# Nyx! A (Mostly Unison League themed) bot...
-"""https://discordapp.com/oauth2/authorize?client_id=
-201425813965373440&scope=bot&permissions=0"""
-# https://drive.google.com/open?id=0B94jrO7TTwmORFlpeTJ1Z09UVEU
-########################################################################
-# Current Tasks:
-# - Port in all the essential modules from the old framework.
-# - Rewrite task scheduling? (Clocks)
-# - Conform to Python styling guidelines laid out in PEP 8.
-#   (Meaning lines are < 80 chars and comments <= 72 chars length.)
-# Future Tasks:
-# - Move all module code on repo to the new Nyx-Modules repo.
-# - Figure out Github API for automatic code updates?
-# - Create thread locks for certain kinds of objects possibly
+"""
+Nyx! A (Mostly Unison League themed) bot...
+https://discordapp.com/oauth2/authorize?client_id=
+201425813965373440&scope=bot&permissions=8
+https://drive.google.com/open?id=0B94jrO7TTwmORFlpeTJ1Z09UVEU
 
-# Experimental Startup Parameters:
-modules_folder = "modules"
-module_prefix = "mod"
-servers_folder = "servers"
-users_folder = "users"
+Current Tasks:
+ - Rewrite framework to use Discord cogs and stuff...
+ - Rewrite task scheduling? (Clocks)
+ - Conform to Python styling guidelines laid out in PEP 8.
+ - Wait for Rapptz's discord.py rewrite to come out.
+Future Tasks:
+ - Move all module code on repo to the new Nyx-Modules repo.
+ - Figure out GitHub API for automatic code updates?
+ - Create thread locks for certain kinds of objects possibly...
+"""
 
-########################################################################
-# Python Libraries
-########################################################################
-
-import asyncio
-from contextlib import redirect_stdout
-from datetime import datetime
-import discord
-from importlib import reload
-from io import StringIO
-from nyxutils import binary_search, trim
-from os import getcwd, listdir, mkdir
-from os.path import isfile
-# TODO: Decide specific sys imports to use?
 import sys
+from contextlib import closing, redirect_stdout
+from io import StringIO
+from ntpath import basename
+from os import getcwd, listdir
+from os.path import isfile
 
-
-# TODO: kete; Setsunasa ni wa namae o tsukeyou ka "Snow halation"
-
-
-########################################################################
-# Main Object Types
-########################################################################
-
-class Command:
-    """Holder object for a single function that originates from a
-    particular module that is imported into Nyx. Command alias
-    system is still a WIP.
-    """
-
-    def __init__(self, function, name, names=None, has_access=None, **kwargs):
-        self.function = function
-        self.has_access = has_access
-        self.names = []
-        self.data = {"privilege": 1}
-        if name is not None:
-            self.names.append(name)
-        if names is not None:
-            self.names.extend(names)
-        for key in kwargs:
-            self.data[key] = kwargs[key]
-
-    @property
-    def name(self):
-        return self.names[0]
-
-    @property
-    def privilege(self):
-        return self.data["privilege"]
-
-
-class Module:
-    """Holder object for a particular module that is imported into Nyx.
-    The command mapping system is still a WIP.
-    """
-
-    def __init__(self, name, folder, module, **_):
-        self.commands = []
-        self.command_map = {}
-        self.disabled = False
-        self.folder = folder
-        self.module = module
-        self.names = [name]
-        self.primary = False
-        self.listeners = {}
-
-    @property
-    def name(self):
-        return self.names[0]
-
-    def add_command(self, function, name=None, **kwargs):
-        """Adds a command to the Module listing."""
-        self.remove_command(name)
-        command = Command(function, name, **kwargs)
-        if command.name is None:
-            return None
-        self.commands.append(command)
-        for name in command.names:
-            self.command_map[name] = command
-        # self.commands.sort(key=lambda a: a.name)
-        return command
-
-    def update_command_map(self):
-        """Probably-costly operation to reset the command_map and
-        map each Command name to the Command itself to allow for
-        O(1) time to search for a Command.
-        """
-        self.command_map.clear()
-        for command in self.commands:
-            for name in command.names:
-                self.command_map[name] = command
-
-    def remove_command(self, name):
-        """Completely removes a Command from the Module listing.
-        Will automatically perform a remapping of names to Commands.
-        """
-        remove = self.command_map.get(name, None)
-        if remove is None:
-            return False
-        self.commands.remove(remove)
-        self.update_command_map()
-        return True
-
-    # Listeners triggered in the Discord client will call these if
-    # there exists a listener with a matching event name.
-    def add_listener(self, function, name):
-        """Designate a function to be called upon a certain event
-        name.
-        """
-        self.listeners[name] = function
-
-    def set_listener(self, function, name):
-        """Designate a function to be called upon a certain event
-        name.
-        """
-        self.listeners[name] = function
-
-    def has_listener(self, name):
-        """Checks to see if event listener is designated for a name."""
-        return name in self.listeners
-
-    async def call_listener(self, name, **kwargs):
-        """asdf"""
-        return await self.listeners[name](**kwargs)
-
-    def add_name(self, name):
-        if name not in self.names:
-            self.names.append(name)
+from discord import ClientException
+from discord.ext import commands
+from discord.ext.commands.bot import _get_variable  # lol
+from discord.ext.commands.context import Context
+from discord.ext.commands.errors import CommandError, CommandNotFound
+from discord.ext.commands.view import StringView
+from discord.utils import find
 
 
 class ServerData:
@@ -155,65 +36,24 @@ class ServerData:
     in terms of custom modules imported and prefixes to use.
     """
 
-    def __init__(self, id):
+    def __init__(self, server_id):
         # id variable just in case a function references
         # the id parameter from this type of object.
-        self.id = id
+        self.id = server_id
         self.command_map = {}
         self.data = {}
         self.modules = []
         self.prefixes = []
 
-    def update_command_map(self):
-        """Probably-costly operation to reset the command_map and
-        map each Command name to the Command itself to allow for
-        O(1) time to search for a Command.
-        """
-        self.command_map.clear()
-        for module in self.modules:
-            for cmdname in module.command_map:
-                self.command_map[cmdname] = module.command_map[cmdname]
 
-    def import_mod(self, module):
-        """Adds a module to the list of imported modules if it is not
-        currently on the list of imported modules.
-        """
-        # TODO: Maybe change this to binary_search function to avoid
-        # O(n^2) worst case not found time.
-        # Done. Now this runs in O(1) time lol.
-        if module is None or module.primary or module in self.modules:
-            return False
-        self.modules.append(module)
-        for cmdname in module.command_map:
-            self.command_map[cmdname] = module.command_map[cmdname]
-        return True
-
-    def deport_mod(self, module):
-        """Removes a module from the list of imported modules if it is
-        currently on the list of imported modules. The command map
-        should be updated after calling one or more of these.
-        """
-        # TODO: Maybe change this to binary_search...
-        if module not in self.modules:
-            return False
-        self.modules.remove(module)
-        return True
-
-    def deport(self, module):
-        """Alias for deport_mod."""
-        return self.deport_mod(module)
-
-
-class User:
+class UserData:
     """Class for storing specific data for a Discord user.
     Only the user ID of a Discord User is stored between
     sessions outside of permissions and module-specific data.
     """
 
-    def __init__(self, discord_user, id=None):
+    def __init__(self):
         self.data = {"privilege": 1}
-        self.id = discord_user.id
-        self.user = discord_user
 
     @property
     def privilege(self):
@@ -225,90 +65,83 @@ class User:
     def set_privilege(self, level):
         self.data["privilege"] = level
 
-    def has_access(self, command):
-        if command.has_access is not None:
-            return command.has_access(self)
-        if self.privilege < 0:
-            return self.privilege <= command.privilege
-        elif command.privilege > 0:
-            return self.privilege >= command.privilege
+
+def check_prefix(bot, message):
+    """If a server has no specified custom prefixes, Nyx will use her
+    mention appended before each of her default prefixes.
+    """
+    if message.server is not None:
+        server_prefixes = bot.get_server_data(message.server).prefixes
+        if len(server_prefixes) > 0:
+            return server_prefixes
         else:
-            return command.privilege == 0
+            mention = message.server.get_member(bot.user.id).mention
+            at_prefixes = []
+            for prefix in bot.prefixes:
+                at_prefixes.append(mention + " " + prefix)
+            return at_prefixes
+    return bot.prefixes
 
 
-########################################################################
-# Main Client
-########################################################################
-
-class Nyx:
-    """The main class for holding a client and its modules.
-    More information later. This is a placeholder for multiline doc.
+class Nyx(commands.Bot):
+    """An extension of Discord's Bot class that can handle a collision
+    between two commands from differing cogs with the same name if
+    needed.
     """
 
-    def __init__(self):
-        # TODO: Group variables in some fashion.
-        self.client = discord.Client()
-        self.command_map = {}
+    def __init__(self, **kwargs):
+        self.cogs_folder = None
+        self.collision = False
+        # Used to group commands by module name for easy collision resolution.
+        self.namespaces = {}
+        self.owner = None
         # Default command prefixes that can be overwritten...
-        self.command_prefixes = ["$", "~", "!", "%", "^", "&",
-                                 "*", "-", "=", ".", ">", "/"]
-        self.modules = []
-        self.modules_folder = None
-        self.module_map = {}
-        # Prefix and/or suffix should be used to distinguish names
-        # from preexisting Python libraries.
-        self.mod_prefix = "mod"
-        self.mod_suffix = ""
-        # TODO: May want to change "servers" to "server_data" as servers
-        # typically refers to discord.Client.servers...
-        self.servers = {}
+        self.prefixes = ["$", "~", "!", "%", "^", "&", "*", "-",
+                         "=", ",", "<", ".", ">", "/", "?"]
+        self.separate = False
+        self.server_data = {}
         self.servers_folder = None
-        self.token = None
-        self.users = {}
+        self.user_data = {}
         self.users_folder = None
-        # Runtime Status
-        self.debug = False
-        self.ready = False
-        self.restart = False  # Option to restart after shutdown.
-        self.shutdown = False
+        super().__init__(command_prefix=check_prefix, **kwargs)
 
-    def loadstring(self, code, **kwargs):
+        @self.event
+        async def on_ready():
+            """Need to get final information about Nyx here."""
+            app_info = await self.application_info()
+            self.owner = app_info.owner
+            print("Connection established.")
+            print("\033[35mNyx has awoken. Only fools fear not of darkness...\033[0m")
+            print("Currently serving " + str(len(self.servers)) + " servers.")
+
+
+    async def loadstring(self, code):
         """Remote execute code from the Discord client or other sources
         for debugging. This returns true if the code to execute runs
-        completely without error. This function also reroutes print
-        statements if kwargs contains a list named "output".
-        
+        completely without error. This function returns a string with
+        output.
+
         Arguments:
         code - the Python 3 code to run within self
         """
-        successful = True
-        output = StringIO()
+        with closing(StringIO()) as log:
+            with redirect_stdout(log):
+                try:
+                    exec(code)
+                # Screw your warnings, PyCharm!
+                except:
+                    error = sys.exc_info()
+                    for e in error:
+                        print(e)
+            return log.getvalue()
 
-        # Reroute output accordingly.
-        # if "output" in kwargs and type(kwargs["output"]) is list:
-        # print = kwargs["output"].append
-        # Attempt to run the code. See if exceptions are thrown???
-        with redirect_stdout(output):
-            try:
-                exec(code)
-            except:
-                error = sys.exc_info()
-                # Will tack error to whatever print is routed to.
-                for e in error:
-                    print(e)
-                successful = False
-
-        if "output" in kwargs and type(kwargs["output"]) is list:
-            kwargs["output"].append(output.getvalue())
+    def get_namespace(self, name):
+        if name not in self.namespaces:
+            namespace = {}
+            self.namespaces[name] = namespace
+            return namespace
         else:
-            print(output.getvalue())
-        output.close()
-
-        return successful
-
-    def get_module(self, name):
-        """Retrieve a Module object by name."""
-        return self.module_map.get(name, None)
+            return self.namespaces[name]
 
     def get_server_data(self, discord_server):
         """Retrieves the ServerData object for a particular Discord
@@ -317,674 +150,164 @@ class Nyx:
         """
         if discord_server is None:
             return None
-        server = None
         # Since both Discord Server and ServerData have a string id
         # parameter, this will still be okay if ServerData is passed.
         if discord_server.id not in self.servers:
             server = ServerData(discord_server.id)
-            self.servers[discord_server.id] = server
+            self.server_data[discord_server.id] = server
+            return server
         else:
-            server = self.servers[discord_server.id]
-        return server
+            return self.server_data[discord_server.id]
 
-    def save_server_data(self, discord_server):
-        """Saves a single instance of ServerData to a file in the
-        specified servers folder.
-        """
-        server = self.get_server_data(discord_server)
-        server_file = getcwd() + "/" + self.servers_folder + "/" + server.id
-        try:
-            data = open(server_file, "w")
-            if len(server.modules > 0):
-                data.write("modules:")
-                data.write(server.modules[0].name)
-                for i in range(1, len(server.modules)):
-                    data.write("/" + server.modules[i].name)
-                data.write("\n")
-            if len(server.prefixes) > 0:
-                data.write("prefixes:" + server.prefixes[0])
-                for i in range(1, len(server.prefixes)):
-                    data.write(" " + server.prefixes[i])
-                data.write("\n")
-            for key in server.data:
-                if key is not "modules" and key is not "prefixes":
-                    data.write(key + ":" + str(server.data[key]) + "\n")
-            data.flush()
-            data.close()
-            return True
-        except:
-            return False
-
-    def save_servers_data(self):
-        """Attempt to save the data for all servers. Will return
-        false if any (yes any lol) server fails to save properly.
-        Not recommended to call this method from more than one
-        module!!
-        """
-        return all(self.save_server_data(self, self.servers[sid])
-                   for sid in self.servers)
-
-    def get_user(self, discord_user):
-        """Retrieves the User object for a particular Discord user.
-        If such a User does not exist, then create a new object to
-        hold data.
-        """
-        user = None
-        if discord_user.id not in self.users:
-            user = User(discord_user)
-            self.users[discord_user.id] = user
+    def get_user_data(self, discord_user):
+        if discord_user.id not in self.user_data:
+            user = UserData()
+            self.user_data[discord_user.id] = user
         else:
-            user = self.users[discord_user.id]
-            # May need to update Discord User object depending on how
-            # discord.py handles the uniqueness of User objects?
-            # Or if we never really instantiated the object?
-            user.user = discord_user
+            user = self.user_data[discord_user.id]
         return user
 
-    def save_user(self, discord_user):
-        """Saves a single instance of User to a file in the
-        specified users folder.
-        """
-        user = self.get_user(discord_user)
-        user_file = getcwd() + "/" + self.users_folder + "/" + user.id
-        try:
-            data = open(user_file, "w")
-            data.write("data:\n")
-            for key in user.data:
-                data.write(key + ":" + str(user.data[key]) + "\n")
-            data.flush()
-            data.close()
-            return True
-        except:
-            return False
-
-    def save_users(self):
-        """Attempt to save the data for all users. Will return
-        false if any (yes any lol) user fails to save properly.
-        Not recommended to call this method from more than one
-        module!!
-        """
-        success = True
-        for uid in self.users:
-            success = self.save_user(self, self.users[uid]) and success
-        return success
-
-    def update_maps(self):
-        self.command_map.clear()
-        self.module_map.clear()
-        for module in self.modules:
-            for name in module.names:
-                self.module_map[name] = module
-            if module.primary:
-                for cmdname in module.command_map:
-                    self.command_map[cmdname] = module.command_map[cmdname]
-
-    def load_module(self, name):
-        """Loads a custom Nyx module into existence."""
-        module = self.get_module(name)
-        try:
-            if module is None:
-                path = getcwd() + "/" + self.modules_folder + "/" + name
-                # Add folder of module to import.
-                sys.path.append(path)
-                module = Module(name, path, __import__(self.mod_prefix + name
-                                                       + self.mod_suffix))
-                # TODO: Call init on module
-                if not module.module.init(client=self, module=module):
-                    return False
-                self.modules.append(module)
-                self.modules.sort(key=lambda a: a.name)
-            elif self.debug:
-                module.module = reload(module.module)
-                # TODO: Call init on module
-                module.commands.clear()
-                module.command_map.clear()
-                if not module.module.init(client=self,
-                                          module=module, nyx=self):
-                    return False
-                module.update_command_map()
-            else:
-                return False
-            return True  # haha poor logical flow
-        except:
-            # TODO: Some error stuff
-            error = sys.exc_info()
-            for e in error:
-                print(e)
-            return False
-
-    def load_modules(self, modules_folder=None):
-        """asdf"""
-        if modules_folder is not None:
-            self.modules_folder = modules_folder
-        if self.modules_folder is None:
-            return False
-        path = getcwd() + "/" + self.modules_folder + "/"
-        success = True
-        for modpath in listdir(path):
-            if isfile(modpath):
+    def load_cogs(self, folder=None):
+        if folder is not None:
+            self.cogs_folder = folder
+        if self.cogs_folder is None:
+            return
+        path = getcwd() + "/" + self.cogs_folder + "/"
+        print(path)
+        sys.path.append(path)
+        for mod_path in listdir(path):
+            if not isfile(path + mod_path):
                 continue
-            mod_name = str(modpath)
-            success = self.load_module(mod_name) and success
-        self.update_maps()
-        return success
+            if mod_path.endswith(".py"):
+                self.load_extension(mod_path[:-3])
 
-    def load_server_data(self, id):
-        """asdf"""
-        path = getcwd() + "/" + self.servers_folder + "/" + id
-        try:
-            data = open(path, "r")
-            server_data = None
-            if id in self.servers:
-                server_data = self.servers[id]
-            else:
-                server_data = ServerData(id)
-                self.servers[id] = server_data
-            # TODO: Update ServerData data dictionary
-            success = True
-            for line in data:
-                line = trim(line)
-                args = line.split(":", 1)
-                if "modules" in args[0]:
-                    # TODO: code to add Modules into ServerData
-                    args = args[1].split("/")
-                    for modname in args:
-                        module = self.get_module(modname)
-                        if module is not None:
-                            success = server_data.import_mod(module) \
-                                      and success
-                elif "prefixes" in args[0]:
-                    # TODO: code to add prefixes into ServerData
-                    server_data.prefixes = args[1].split(" ")
-                else:
-                    server_data.data[args[0]] = args[1]
-            return success
-        except:
-            return False
-
-    def load_servers_data(self, servers_folder=None):
-        """asdf"""
-        if self.servers_folder is None:
-            self.servers_folder = servers_folder
-        if self.servers_folder is None:
-            return False
-        path = getcwd() + "/" + self.servers_folder + "/"
-        success = True
-        for svrpath in listdir(path):
-            if not isfile(svrpath):
-                continue
-            sid = str(svrpath)
-            success = self.load_server_data(sid) and success
-        return success
-
-    def load_user(self, id):
-        """asdf"""
-        path = getcwd() + "/" + self.users_folder + "/" + id
-        try:
-            data = open(path, "r")
-            # TODO: Find User data object.
-            user = None
-            if id in self.users:
-                user = self.users[id]
-            else:  # Force creation of new User object.
-                placeholder = discord.User()
-                placeholder.id = id
-                user = self.get_user(placeholder)
-            # TODO: Update User data dictionary.
-            for line in data:
-                line = trim(line)
-                if not line:
-                    continue
-                args = line.split(":", 1)
-                if args[0] == "privilege":
-                    args[1] = int(args[1])
-                user.data[args[0]] = args[1]
-            return True
-        except:
-            error = sys.exc_info()
-            for e in error:
-                print(e)
-            return False
-
-    def load_users(self, users_folder=None):
-        """asdf"""
-        # Check if a specific folder is designated.
-        if users_folder is not None:
-            self.users_folder = users_folder
-        if self.users_folder is None:
-            return False
-        path = getcwd() + "/" + self.users_folder + "/"
-        success = True
-        try:
-            for usrpath in listdir(path):
-                if not isfile(path + usrpath):
-                    print("not file")
-                    continue
-                # usrpath is the id string of a user and the filename.
-                success = self.load_user(str(usrpath)) and success
-        except FileNotFoundError:
-            mkdir(path)
-        return success
-
-    ####################################################################
-    # Client Events
-    ####################################################################
-
-    async def trigger(self, module, name, **kwargs):
-        if self.shutdown:
-            return False
-        await self.client.wait_until_ready()
-        if module.has_listener(name) and not await \
-                module.call_listener(name, client=self.client,
-                                     nyx=self, **kwargs) is None:
-            return True
-        return False
-
-    async def trigger_modules(self, name, server=None, **kwargs):
-        if server is None:
-            # TODO: Determine if all Modules should listen to DMs...
-            for module in self.modules:
-                await self.trigger(module, name, server=server, **kwargs)
-        else:
-            imports = self.get_server_data(server).modules
-            for module in self.modules:
-                if module.primary or module in imports:
-                    await self.trigger(module, name, server=server, **kwargs)
-
-    def connect_events(self):
-        """Sets up listeners for triggering Modules for events.
-        These are placed in the same order as:
-        http://discordpy.readthedocs.io/en/latest/api.html
-        except for the on_message event, which has its own separate
-        section.
-        """
-        client = self.client
-
-        @client.event
-        async def on_ready():
-            await self.trigger_modules("on_ready")
-
-        @client.event
-        async def on_resumed():
-            await self.trigger_modules("on_resumed")
-
-        # Unknown what really is passed to on_error event??
-        # For now, modules can't subscribe to it...
-        @client.event
-        async def on_error(event, *args, **kwargs):
-            print("Error encountered! (" + str(event) + ")")
-            for a in args:
-                print(str(a))
-            for key in kwargs:
-                print(key + " - " + kwargs[key])
-
-        # This is where on_socket_raw_receive and on_socket_raw_send
-        # would be, but I don't think anyone would care.
-
-
-        @client.event
-        async def on_message_delete(message):
-            member = None if message.server is None else message.author
-            await self.trigger_modules("on_message_delete", message=message,
-                                       server=message.server, channel=message.channel,
-                                       user=message.author, member=member)
-
-        @client.event
-        async def on_message_edit(message1, message2):
-            """At this point, we're throwing a lot of kwargs in and
-            hoping something sticks to the wall... help.
-            """
-            member = None if message2.server is None else message2.author
-            await self.trigger_modules("on_message_edit", message=message2,
-                                       server=message2.server, channel=message2.channel,
-                                       user=message2.author, member=member,
-                                       before=message1, after=message2)
-
-        @client.event
-        async def on_reaction_add(reaction, user):
-            message = reaction.message
-            member = None if message.server is None else user
-            await self.trigger_modules("on_reaction_add", message=message,
-                                       server=message.server, channel=message.channel,
-                                       user=user, member=member, reaction=reaction,
-                                       emoji=reaction.emoji)
-
-        @client.event
-        async def on_reaction_remove(reaction, user):
-            message = reaction.message
-            member = None if message.server is None else user
-            await self.trigger_modules("on_reaction_remove", message=message,
-                                       server=message.server, channel=message.channel,
-                                       user=user, member=member, reaction=reaction,
-                                       emoji=reaction.emoji)
-
-        @client.event
-        async def on_reaction_clear(message, reactions):
-            await self.trigger_modules("on_reaction_remove", message=message,
-                                       server=message.server, channel=message.channel,
-                                       reactions=reactions)
-
-        @client.event
-        async def on_channel_create(channel):
-            await self.trigger_modules("on_channel_create",
-                                       server=channel.server, channel=channel)
-
-        @client.event
-        async def on_channel_delete(channel):
-            await self.trigger_modules("on_channel_delete",
-                                       server=channel.server, channel=channel)
-
-        @client.event
-        async def on_channel_update(channel1, channel2):
-            await self.trigger_modules("on_channel_update",
-                                       server=channel2.server, channel=channel2,
-                                       before=channel1, after=channel2)
-
-        @client.event
-        async def on_member_join(member):
-            await self.trigger_modules("on_member_join", server=member.server,
-                                       user=member, member=member)
-
-        @client.event
-        async def on_member_remove(member):
-            await self.trigger_modules("on_member_remove",
-                                       server=member.server, user=member, member=member)
-
-        @client.event
-        async def on_member_update(member1, member2):
-            await self.trigger_modules("on_member_update",
-                                       server=member2.server, user=member2,
-                                       member=member2, before=member1, after=member2)
-
-        @client.event
-        async def on_server_join(server):
-            await self.trigger_modules("on_server_join", server=server)
-
-        @client.event
-        async def on_server_remove(server):
-            await self.trigger_modules("on_server_remove", server=server)
-
-        @client.event
-        async def on_server_update(server1, server2):
-            await self.trigger_modules("on_server_update", server=server2,
-                                       before=server1, after=server2)
-
-        @client.event
-        async def on_server_role_create(role):
-            await self.trigger_modules("on_server_role_create",
-                                       server=role.server, role=role)
-
-        @client.event
-        async def on_server_role_delete(role):
-            await self.trigger_modules("on_server_role_delete",
-                                       server=role.server, role=role)
-
-        @client.event
-        async def on_server_role_update(role1, role2):
-            await self.trigger_modules("on_server_role_delete",
-                                       server=role2.server, role=role2,
-                                       before=role1, after=role2)
-
-        @client.event
-        async def on_server_emojis_update(list1, list2):
-            server = None
-            if len(list1) > 0:
-                server = list1[0].server
-            # TODO: Confirm the theory that either list
-            # has at least 1 emoji in it.
-            else:
-                server = list2[0].server
-            await self.trigger_modules("on_server_emojis_update",
-                                       server=server, emojis=list2,
-                                       before=list1, after=list2)
-
-        @client.event
-        async def on_server_available(server):
-            await self.trigger_modules("on_server_available", server=server)
-
-        @client.event
-        async def on_server_unavailable(server):
-            await self.trigger_modules("on_server_unavailable", server=server)
-
-        @client.event
-        async def on_voice_state_update(member1, member2):
-            await self.trigger_modules("on_voice_state_update",
-                                       server=member2.server, member=member2,
-                                       before=member1, after=member2)
-
-        @client.event
-        async def on_member_ban(member):
-            await self.trigger_modules("on_member_ban", server=member.server,
-                                       user=member, member=member)
-
-        @client.event
-        async def on_member_unban(server, user):
-            await self.trigger_modules("on_member_unban",
-                                       server=server, user=user)
-
-        @client.event
-        async def on_typing(channel, user, when):
-            server = None if channel.is_private else channel.server
-            member = None if server is None else user
-            if member is not None:
-                user = member
-            await self.trigger_modules("on_typing", server=server,
-                                       channel=channel, user=user,
-                                       member=member, time=when)
-
-        @client.event
-        async def on_group_join(channel, user):
-            await self.trigger_modules("on_group_join",
-                                       channel=channel, user=user)
-
-        @client.event
-        async def on_group_remove(channel, user):
-            await self.trigger_modules("on_group_remove",
-                                       channel=channel, user=user)
-
-        ################################################################
-        # Main Message Event
-        ################################################################
-
-        @client.event
-        async def on_message(message):
-            if message.author.id == client.user.id:
-                return
-            # TODO: Main on_message handling
-            # Have all listening modules trigger on_message event.
-            server = message.server
-            server_data = self.get_server_data(server)
-            await self.trigger_modules("on_message", server=server,
-                                       message=message)
-
-            command = False
-            talk = server is None
-            # Normalize message and search for module or command call.
-            # If the bot client is mentioned at the beginning of the
-            # message, remove the mention and the bot user from the list
-            # of mentions unless the bot is mentioned more than once.
-            for user in message.mentions:
-                if user == self.client.user:
-                    mention = user.mention
-                    if message.content.startswith(user.mention):
-                        talk = True
-                        message.content = message.content[len(mention):] \
-                            .strip()
-                    # Check for a second mention before removing user.
-                    if user.mention not in message.content:
-                        message.mentions.remove(user)
-
-            # Check to see if command type message is in place,
-            # also normalizing message by removing the prefix.
-            if talk:
-                for prefix in self.command_prefixes:
-                    if message.content.startswith(prefix):
-                        command = True
-                        message.content = message.content[len(prefix):].strip()
-                        break
-            if server_data is not None and not command:
-                for prefix in server_data.prefixes:
-                    if message.content.startswith(prefix):
-                        command = True
-                        message.content = message.content[len(prefix):].strip()
-                        break
-
-            # Execute command from non-bot if command type message.
-            # By this point, we have the following normalized format:
-            # <command or module> <command> [param1] [param2] ...
-            # e.g. unison ap stat 32 140
-            # from original command @user $unison ap stat 32 140
-            # oh, and also check of message.content is not empty...
-            if command and message.content and not message.author.bot:
-                # Priority on first keyword arg (if cmd prefix is used):
-                # First: (primary) module commands (command_map)
-                # Second: imported server module commands (if exists)
-                # Third: individual module names
-                # TODO: Change var name 'args' to understandable name?
-                args = message.content.lower().split(" ")
-                # Check for core commands or module names:
-                command = self.command_map.get(args[0], None)
-                module = self.module_map.get(args[0], None)
-
-                if command is None and server_data is not None:
-                    # Check for imported server commands if no core
-                    # command has been found.
-                    command = server_data.command_map.get(args[0], None)
-                if command is None and module is not None and len(args) > 1:
-                    command = module.command_map.get(args[1], None)
-
-                # Execute command and send output message if exists.
-                if command is not None:
-                    output = None
-                    user = self.get_user(message.author)
-                    if user.has_access(command):
-                        output = await command.function(client=self.client,
-                                                        message=message,
-                                                        nyx=self)
-                    elif server is None:
-                        output = "You do not have access to that command."
-                    if output is not None:
-                        output = str(output)
-                        if server is not None:
-                            name = message.author.display_name
-                            output = name + ", " + output
-                        await client.send_message(message.channel, output)
-
-                # Trigger module help event.
-                elif module is not None:
-                    await self.trigger(module, "help", server=server,
-                                       message=message)
-
-            # If user is known to be talking to Nyx, but no bot command
-            # was issued, then issue talk event to possible chat mods.
-            elif talk:
-                await self.trigger_modules("talk", server=server,
-                                           message=message)
-
-                ########################################################################
-                # Main Background Clock
-                ########################################################################
-
-    async def clock(self):
-        print("Main background clock created.")
-        await self.client.wait_until_ready()
-        last_minute = -1
-        while not self.shutdown:
-            await asyncio.sleep(0.5)
-            dtime = datetime.now()
-            if last_minute != dtime.minute:
-                last_minute = dtime.minute
-                # print("minute tick")
-                for module in self.modules:
-                    try:
-                        await self.trigger(module, "clock",
-                                           server=None, time=dtime)
-                    except:
-                        # TODO: Handle individual module clock error.
-                        pass
-
-        print("The system is going down now!")
-        await asyncio.sleep(1)
-        print("Logging out of Discord...")
-        await self.client.change_presence(game= \
-                                          discord.Game(name="shutdown..."),
-                                          status=discord.Status.idle)
-        await asyncio.sleep(1)
-        print("Here's your gold. Goodbye.")
-        await self.client.logout()
-
-    ########################################################################
-    # Client Main Loop with Startup
-    ########################################################################
-    # TODO: Refer to:
-    # http://discordpy.readthedocs.io/en/latest/migrating.html
-
-
-    async def main(self):
-        await self.client.login(self.token)
-        await self.client.connect()
-
-    def start(self):
-        self.connect_events()
-        clock = self.client.loop.create_task(self.clock())
-        while not self.shutdown:
+    def add_command(self, command):
+        if not self.collision:
             try:
-                if not self.shutdown:
-                    self.client.loop.run_until_complete(self.main())
-            except KeyboardInterrupt:
-                print("\nKilled.")
-                self.shutdown = True
-                clock.cancel()
-            except:
-                if self.shutdown:
-                    break
-        self.client.loop.run_until_complete(self.client.logout())
-        self.client.loop.close()
+                super().add_command(command)
+            except ClientException:
+                self.collision = True
+        cog_name = _get_variable("_cog_name")
+        if cog_name is None:
+            cog_name = "none"
+            # If someone makes a cog named "None" they shouldn't.
+        else:
+            cog_name = cog_name.lower()
+        namespace = self.get_namespace(cog_name)
+        namespace[command.name] = command
+        for alias in command.aliases:
+            namespace[alias] = command
 
+    def remove_command(self, name):
+        to_return = None
+        if not self.collision:
+            to_return = super().remove_command(name)
+        cog_name = _get_variable("_cog_name")
+        if cog_name is None:
+            cog_name = "none"
+            # If someone makes a cog named "None" they shouldn't.
+        else:
+            cog_name = cog_name.lower()
+        namespace = self.get_namespace(cog_name)
+        command = namespace.pop(name, None)
+        if command is None:
+            return to_return
+        if name in command.aliases:
+            return command
+        for alias in command.aliases:
+            namespace.pop(alias, None)
+        return command
 
-########################################################################
-# Startup
-########################################################################
-# Default startup sequence if this .py file is run.
+    def add_cog(self, cog):
+        """Nyx's override to adding a cog."""
+        _cog_name = type(cog).__name__
+        super().add_cog(cog)
+
+    def remove_cog(self, name):
+        """Nyx's override to removing a cog."""
+        _cog_name = name
+        super().remove_cog(name)
+
+    async def process_commands(self, message):
+        """Nyx's override to the default process_commands method."""
+
+        _internal_channel = message.channel
+        _internal_author = message.author
+
+        view = StringView(message.content)
+        if self._skip_check(message.author, self.user):
+            return
+
+        prefix = await self._get_prefix(message)
+        invoked_prefix = prefix
+
+        if not isinstance(prefix, (tuple, list)):
+            if not view.skip_string(prefix):
+                return
+        else:  # discord.utils.find
+            invoked_prefix = find(view.skip_string, prefix)
+            if invoked_prefix is None:
+                return
+
+        command = None
+        invoker = view.get_word()
+        if message.server is not None:
+            command = self.get_server_data(message.server).command_map.get(invoker, None)
+        namespace = self.namespaces.get(invoker.lower(), self.namespaces.get("none", None))
+        print(invoker)
+        print(namespace)
+        tmp = {
+            'bot': self,
+            'invoked_with': invoker,
+            'message': message,
+            'view': view,
+            'prefix': invoked_prefix
+        }
+        ctx = Context(**tmp)
+        del tmp
+
+        if command is None:
+            if not self.collision and not self.separate:
+                command = self.commands.get(invoker, None)
+            if command is None and namespace is not None:
+                view.skip_ws()
+                invoker2 = view.get_word()
+                if invoker2:
+                    ctx.invoked_with = invoker2
+                    command = namespace.get(invoker2, None)
+                    if command is not None:
+                        # remove module name and splice message.content
+                        # this is to prevent confusion to cogs that expect
+                        # the format <prefix> <command> <content>
+                        omit = message.content.index(invoker)
+                        message.content = message.content[:omit].strip() + message.content[omit + len(invoker):].strip()
+
+        if command is not None:
+            self.dispatch("command", command, ctx)
+            try:
+                await command.invoke(ctx)
+            except CommandError as e:
+                ctx.command.dispatch_error(e, ctx)
+            else:
+                self.dispatch('command_completion', command, ctx)
+        elif invoker:
+            exc = CommandNotFound('Command "{}" is not found'.format(invoker))
+            self.dispatch('command_error', exc, ctx)
 
 
 if __name__ == "__main__":
-    # global modules_folder
-    # global servers_folder
-    # global users_folder
-    try:  # Bypass ANSI escape sequences on output file.
-        import colorama
-
-        colorama.init()
-    except:
-        pass
-    from nyxutils import print_line
-
-    print_line()
-    import nyxsplash  # Nyx art splash
-
-    print_line()
-    import logging
-
-    logging.basicConfig(level=logging.INFO)
     nyx = Nyx()
-    nyx.modules_folder = modules_folder
-    nyx.module_prefix = module_prefix
-    nyx.servers_folder = servers_folder
-    nyx.users_folder = users_folder
-    # TODO: Temp code clear
-    token = None
-    try:
-        info = open("info.nyx", "r")
-        for line in info:
-            if line.startswith("~TOKEN:"):
-                token = line[7:]
-                while token[-1:] == "\r" or token[-1:] == "\n":
-                    token = token[:-1]
-    except:
-        print("[FATAL] Unable to find or read token in info file.")
-    nyx.load_modules()
-    nyx.load_servers_data()
-    nyx.load_users()
-    nyx.token = token
-    nyx.start()
+
+    nyx.load_cogs("cogs")
+
+    nyx.run("token")
+
+    for mod in nyx.namespaces:
+        print("Mod " + mod)
+        for c in nyx.namespaces[mod]:
+            print(c)
+    print("...")
+    for key in nyx.commands:
+        print(key)
+        print(basename(nyx.commands[key].module.__file__))
+    print("...")
