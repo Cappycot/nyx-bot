@@ -93,6 +93,7 @@ class Nyx(commands.Bot):
         self.cogs_folder = None
         self.collision = False
         # Used to group commands by module name for easy collision resolution.
+        self.core_commands = {}
         self.namespaces = {}
         self.owner = None
         # Default command prefixes that can be overwritten...
@@ -114,8 +115,7 @@ class Nyx(commands.Bot):
             print("\033[35mNyx has awoken. Only fools fear not of darkness...\033[0m")
             print("Currently serving " + str(len(self.servers)) + " servers.")
 
-
-    async def loadstring(self, code):
+    async def loadstring(self, code, ctx):
         """Remote execute code from the Discord client or other sources
         for debugging. This returns true if the code to execute runs
         completely without error. This function returns a string with
@@ -186,8 +186,9 @@ class Nyx(commands.Bot):
             try:
                 super().add_command(command)
             except ClientException:
+                print("Collision encountered at command " + command.name)
                 self.collision = True
-        cog_name = _get_variable("_cog_name")
+        cog_name = command.cog_name
         if cog_name is None:
             cog_name = "none"
             # If someone makes a cog named "None" they shouldn't.
@@ -218,16 +219,6 @@ class Nyx(commands.Bot):
             namespace.pop(alias, None)
         return command
 
-    def add_cog(self, cog):
-        """Nyx's override to adding a cog."""
-        _cog_name = type(cog).__name__
-        super().add_cog(cog)
-
-    def remove_cog(self, name):
-        """Nyx's override to removing a cog."""
-        _cog_name = name
-        super().remove_cog(name)
-
     async def process_commands(self, message):
         """Nyx's override to the default process_commands method."""
 
@@ -254,8 +245,8 @@ class Nyx(commands.Bot):
         if message.server is not None:
             command = self.get_server_data(message.server).command_map.get(invoker, None)
         namespace = self.namespaces.get(invoker.lower(), self.namespaces.get("none", None))
-        print(invoker)
-        print(namespace)
+        # print(invoker)
+        # print(namespace)
         tmp = {
             'bot': self,
             'invoked_with': invoker,
@@ -301,13 +292,3 @@ if __name__ == "__main__":
     nyx.load_cogs("cogs")
 
     nyx.run("token")
-
-    for mod in nyx.namespaces:
-        print("Mod " + mod)
-        for c in nyx.namespaces[mod]:
-            print(c)
-    print("...")
-    for key in nyx.commands:
-        print(key)
-        print(basename(nyx.commands[key].module.__file__))
-    print("...")

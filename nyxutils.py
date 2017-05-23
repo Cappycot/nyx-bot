@@ -1,3 +1,6 @@
+from discord.ext.commands.view import StringView
+
+
 def binary_search(array, query, key=lambda a: a, start=0, end=-1):
     """Python's 'in' keyword performs a linear search on arrays.
     Given the circumstances of storing sorted arrays, it's better
@@ -30,6 +33,50 @@ def binary_search(array, query, key=lambda a: a, start=0, end=-1):
         return binary_search(array, query, key, mid + 1, end)
     else:
         return array[mid]
+
+
+def get_predicate(ctx):
+    view = StringView(ctx.message.content)
+    view.skip_string(ctx.prefix + ctx.invoked_with)
+    return view.read_rest().strip()
+
+
+def get_server_member(server, query):
+    result = server.get_member(query)
+    query = query.lower()
+    if result is not None:
+        return result
+    for member in server.members:
+        if member.nick and member.nick.lower().startswith(query):
+            return member
+        elif member.name.lower().startswith(query):
+            return member
+    for member in server.members:
+        if member.nick and query in member.nick.lower():
+            return member
+        elif query in member.name.lower():
+            return member
+    return None
+
+
+def parse_mention(ctx, mention):
+    mention = mention[2:-1]
+    if mention.startswith("!"):
+        mention = mention[1:]
+    if ctx.message.server is None:
+        for user in ctx.message.mentions:
+            if user.id == mention:
+                return user
+    else:
+        return ctx.message.server.get_member(mention)
+
+
+def get_user(ctx, query):
+    if query.startswith("<"):
+        return parse_mention(ctx, query)
+    elif ctx.message.server is not None:
+        return get_server_member(ctx.message.server, query)
+    return None
 
 
 # Prints a list in legible format
@@ -67,6 +114,13 @@ def remove_bots(alist, key=lambda a: a):
             alist.remove(alist[i])
         else:
             i += 1
+
+
+async def respond(ctx, content):
+    if ctx.message.server is None:
+        await ctx.bot.say(content)
+    else:
+        await ctx.bot.reply(content)
 
 
 def trim(string):
