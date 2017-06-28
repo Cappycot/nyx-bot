@@ -8,7 +8,8 @@ Current Tasks:
  - Rewrite framework to use Discord cogs and stuff...
  - Rewrite task scheduling? (Clocks)
  - Conform to Python styling guidelines laid out in PEP 8.
- - Wait for Rapptz's discord.py rewrite to come out.
+ - Split Nyx up into Nyx and AutoShardedNyx and have original
+   be NyxBase...
 Future Tasks:
  - Move all module code on repo to the new Nyx-Modules repo.
  - Figure out GitHub API for automatic code updates?
@@ -16,30 +17,25 @@ Future Tasks:
 """
 
 import sys
+from configparser import ConfigParser
 from contextlib import closing, redirect_stdout
 from io import StringIO
-from ntpath import basename
 from os import getcwd, listdir
 from os.path import isfile
 
-from discord import ClientException
-from discord.ext import commands
-from discord.ext.commands.bot import _get_variable  # lol
-from discord.ext.commands.context import Context
-from discord.ext.commands.errors import CommandError, CommandNotFound
+from discord.ext.commands import Bot, Command, Context, GroupMixin
 from discord.ext.commands.view import StringView
-from discord.utils import find
 
 
-class ServerData:
-    """Class for holding preference data for Discord servers
+class GuildData:
+    """Class for holding preference data for Discord guilds
     in terms of custom modules imported and prefixes to use.
     """
 
-    def __init__(self, server_id):
+    def __init__(self, guild_id: int):
         # id variable just in case a function references
         # the id parameter from this type of object.
-        self.id = server_id
+        self.id = guild_id
         self.command_map = {}
         self.data = {}
         self.modules = []
@@ -67,59 +63,191 @@ class UserData:
 
 
 def check_prefix(bot, message):
-    """If a server has no specified custom prefixes, Nyx will use her
-    mention appended before each of her default prefixes.
+    """If a guild has no specified custom prefixes, Nyx will use her mention
+    appended before each of her default prefixes.
     """
-    if message.server is not None:
-        server_prefixes = bot.get_server_data(message.server).prefixes
-        if len(server_prefixes) > 0:
-            return server_prefixes
-        else:
-            mention = message.server.get_member(bot.user.id).mention
-            at_prefixes = []
-            for prefix in bot.prefixes:
-                at_prefixes.append(mention + " " + prefix)
-            return at_prefixes
-    return bot.prefixes
+    if message.guild is not None:
+        at_prefixes = []
+        mention = message.guild.get_member(bot.user.id).mention
+        for prefix in bot.prefixes:
+            at_prefixes.append(mention + " " + prefix)
+        guild_prefixes = bot.get_guild_data(message.guild).prefixes
+        return guild_prefixes + at_prefixes
+    else:
+        return bot.prefixes
 
 
-class Nyx(commands.Bot):
-    """An extension of Discord's Bot class that can handle a collision
-    between two commands from differing cogs with the same name if
-    needed.
+class Nyx(Bot):
+    """An extension of Discord's Bot class that can handle a collision between
+    two commands from differing cogs with the same name if needed.
     """
 
     def __init__(self, **kwargs):
         self.cogs_folder = None
-        self.collision = False
         # Used to group commands by module name for easy collision resolution.
         self.core_commands = {}
+        self.disambiguations = {}
         self.namespaces = {}
         self.owner = None
         # Default command prefixes that can be overwritten...
         self.prefixes = ["$", "~", "!", "%", "^", "&", "*", "-",
                          "=", ",", "<", ".", ">", "/", "?"]
         self.separate = False
-        self.server_data = {}
-        self.servers_folder = None
+        self.guild_data = {}
+        self.guilds_folder = None
         self.user_data = {}
         self.users_folder = None
         super().__init__(command_prefix=check_prefix, **kwargs)
 
-        @self.event
-        async def on_ready():
-            """Need to get final information about Nyx here."""
-            app_info = await self.application_info()
-            self.owner = app_info.owner
-            print("Connection established.")
-            print("\033[35mNyx has awoken. Only fools fear not of darkness...\033[0m")
-            print("Currently serving " + str(len(self.servers)) + " servers.")
+    def add_cog(self, cog):
+        super().add_cog(cog)
+
+    def add_command(self, command):
+        # Raise the usual errors from super method.
+        if not isinstance(command, Command):
+            raise TypeError('The command passed must be a subclass of Command')
+
+        if command.name not in self.all_commands:
+            self.all_commands[command.name] = command
+            for alias in command.aliases:
+                if alias not in self.all_commands:
+                    self.all_commands[alias] = command
+                else:
+                    del self.all_commands[alias]
+        else:
+            del self.all_commands[command.name]
+
+        # Add to disambiguations...
+        self.get_disambiguation(command.name, create=True)[
+            id(command)] = command
+        for alias in command.aliases:
+            self.get_disambiguation(alias, create=True)[id(command)] = command
+
+        # Add to namespace...
+        cog_name = command.cog_name
+        if cog_name is None:
+            cog_name = "none"
+            # If someone makes a cog named "None" they shouldn't.
+        else:
+            cog_name = cog_name.lower()
+        namespace = self.get_namespace(cog_name, create=True)
+        namespace[command.name] = command
+        for alias in command.aliases:
+            namespace[alias] = command
+
+    def get_command(self, name):
+        names = name.split()
+        command = None
+        disambiguation = self.get_disambiguation(names[0])
+        namespace = self.get_namespace(names[0])
+        sub_command = 1
+
+        if disambiguation is None and namespace is None:
+            return None
+        elif disambiguation is not None and len(disambiguation) == 1:
+            for val in disambiguation.values():
+                command = val
+
+        if command is None:
+            if namespace is None or len(names) < 2:
+                return None
+            command = namespace.get(names[1], None)
+            sub_command = 2
+
+        if command is not None and isinstance(command, GroupMixin):
+            for name in names[sub_command:]:
+                try:
+                    command = command.all_commands[name]
+                except (AttributeError, KeyError):
+                    return None
+        return command
+
+    async def get_context(self, message, *args, cls=Context):
+        ctx = await super().get_context(message, *args, cls=Context)
+        if ctx.command is None and ctx.prefix is not None:
+            # Attempt to grab command
+            view = StringView(message.content)
+            ctx.view = view
+            view.skip_string(ctx.prefix)
+
+            invoker = view.get_word()
+            ctx.invoked_with = invoker
+
+            disambiguation = self.get_disambiguation(invoker)
+            if disambiguation is not None:
+                if len(disambiguation) == 1:
+                    for val in disambiguation.values():
+                        ctx.command = val
+                        return ctx
+                elif len(disambiguation) > 1:
+                    return ctx
+
+            namespace = self.get_namespace(invoker)
+            if namespace is not None:
+                view.skip_ws()
+                invoker = view.get_word()
+                if invoker:
+                    ctx.invoked_with = invoker
+                    ctx.command = namespace.get(invoker, None)
+        return ctx
+
+    def remove_cog(self, name):
+        return super().remove_cog(name)
+
+    def remove_command(self, name, cog=None):
+        """Will exterminate the most recently-added command bearing the
+        specified name."""
+        super().remove_command(name)
+        # self.all_commands has been dealt with at this point.
+        disambiguation = self.get_disambiguation(name)
+        if disambiguation is None:
+            return None
+        command = None
+        for cmd in disambiguation.values():
+            if cog is None or str(cog) == cmd.cog_name:
+                command = cmd
+        if command is not None:
+            namespace = self.get_namespace(str(command.cog_name).lower())
+            if namespace is None:
+                return command  # Should not occur.
+            disambiguation.pop(id(command))
+            if len(disambiguation) == 1:
+                for cmd in disambiguation.values():
+                    self.all_commands[name] = cmd
+            namespace.pop(name)
+            if name not in command.aliases:
+                for alias in command.aliases:
+                    disambiguation = self.get_disambiguation(alias)
+                    if disambiguation is None:
+                        continue  # Should not occur.
+                    disambiguation.pop(id(command))
+                    if len(disambiguation) == 0:
+                        del self.disambiguations[alias]
+                    elif len(disambiguation) == 1:
+                        for cmd in disambiguation.values():
+                            self.all_commands[alias] = cmd
+                    namespace.pop(alias)
+        return command
+
+    def remove_commands_named(self, name, cog=None):
+        count = 0
+        while self.remove_command(name, cog=cog) is not None:
+            count += 1
+        return count
+
+    def walk_commands(self):
+        return super().walk_commands()
+
+    async def on_ready(self):
+        print("Connection established.")
+        print("\033[35mNyx has awoken. " +
+              "Only fools fear not of darkness...\033[0m")
+        print("Currently serving " + str(len(self.guilds)) + " guilds.")
 
     async def loadstring(self, code, ctx):
-        """Remote execute code from the Discord client or other sources
-        for debugging. This returns true if the code to execute runs
-        completely without error. This function returns a string with
-        output.
+        """Remote execute code from the Discord client or other sources for
+        debugging. This returns true if the code to execute runs completely 
+        without error. This function returns a string with output.
 
         Arguments:
         code - the Python 3 code to run within self
@@ -135,31 +263,47 @@ class Nyx(commands.Bot):
                         print(e)
             return log.getvalue()
 
-    def get_namespace(self, name):
+    def get_disambiguation(self, name, create=False):
+        if name not in self.disambiguations:
+            if not create:
+                return None
+            disambiguation = {}
+            self.disambiguations[name] = disambiguation
+            return disambiguation
+        else:
+            return self.disambiguations[name]
+
+    def get_namespace(self, name, create=False):
         if name not in self.namespaces:
+            if not create:
+                return None
             namespace = {}
             self.namespaces[name] = namespace
             return namespace
         else:
             return self.namespaces[name]
 
-    def get_server_data(self, discord_server):
-        """Retrieves the ServerData object for a particular Discord
-        server. If such ServerData does not exist, then create a new
-        object to hold data.
+    def get_guild_data(self, discord_guild):
+        """Retrieves the GuildData object for a particular Discord guild.
+        If such GuildData does not exist, then create a new object to hold
+        data.
         """
-        if discord_server is None:
+        if discord_guild is None:
             return None
-        # Since both Discord Server and ServerData have a string id
-        # parameter, this will still be okay if ServerData is passed.
-        if discord_server.id not in self.servers:
-            server = ServerData(discord_server.id)
-            self.server_data[discord_server.id] = server
-            return server
+        # Since both Discord Guild and GuildData have a string id
+        # parameter, this will still be okay if GuildData is passed.
+        # Quack quack.
+        if discord_guild.id not in self.guilds:
+            guild = GuildData(discord_guild.id)
+            self.guild_data[discord_guild.id] = guild
+            return guild
         else:
-            return self.server_data[discord_server.id]
+            return self.guild_data[discord_guild.id]
 
     def get_user_data(self, discord_user):
+        if discord_user is None:
+            return None
+        # Quack quack.
         if discord_user.id not in self.user_data:
             user = UserData()
             self.user_data[discord_user.id] = user
@@ -171,7 +315,7 @@ class Nyx(commands.Bot):
         if folder is not None:
             self.cogs_folder = folder
         if self.cogs_folder is None:
-            return
+            return False
         path = getcwd() + "/" + self.cogs_folder + "/"
         print(path)
         sys.path.append(path)
@@ -180,110 +324,57 @@ class Nyx(commands.Bot):
                 continue
             if mod_path.endswith(".py"):
                 self.load_extension(mod_path[:-3])
+        return True
 
-    def add_command(self, command):
-        if not self.collision:
+    def load_guild_data(self, folder=None):
+        if folder is not None:
+            self.guilds_folder = folder
+        if self.guilds_folder is None:
+            return False
+        config = ConfigParser()
+        path = getcwd() + "/" + self.guilds_folder + "/"
+        for guild_path in path:
+            if not isfile(path + guild_path):
+                continue
             try:
-                super().add_command(command)
-            except ClientException:
-                print("Collision encountered at command " + command.name)
-                self.collision = True
-        cog_name = command.cog_name
-        if cog_name is None:
-            cog_name = "none"
-            # If someone makes a cog named "None" they shouldn't.
-        else:
-            cog_name = cog_name.lower()
-        namespace = self.get_namespace(cog_name)
-        namespace[command.name] = command
-        for alias in command.aliases:
-            namespace[alias] = command
+                guild_data = GuildData(int(guild_path))
+            except ValueError:
+                continue
+            with open(path + guild_path) as file:
+                config.read_file(file)
+                if "Settings" in config:
+                    settings = config["Settings"]
+                    if "Modules" in settings:
+                        guild_data.modules.extend(
+                            settings["Modules"].split(" "))
+                    if "Prefixes" in settings:
+                        guild_data.prefixes.extend(
+                            settings["Prefixes"].split(" "))
+                if "Data" in config:
+                    data = config["Data"]
+                    for key in data:
+                        guild_data.data[key] = data.get(key, None)
+        return True
 
-    def remove_command(self, name):
-        to_return = None
-        if not self.collision:
-            to_return = super().remove_command(name)
-        cog_name = _get_variable("_cog_name")
-        if cog_name is None:
-            cog_name = "none"
-            # If someone makes a cog named "None" they shouldn't.
-        else:
-            cog_name = cog_name.lower()
-        namespace = self.get_namespace(cog_name)
-        command = namespace.pop(name, None)
-        if command is None:
-            return to_return
-        if name in command.aliases:
-            return command
-        for alias in command.aliases:
-            namespace.pop(alias, None)
-        return command
+    def load_user_data(self, folder=None):
+        pass
 
-    async def process_commands(self, message):
-        """Nyx's override to the default process_commands method."""
+    def save_guild_data(self, guild_data, folder=None):
+        pass
 
-        _internal_channel = message.channel
-        _internal_author = message.author
+    def save_all_guild_data(self, folder=None):
+        pass
 
-        view = StringView(message.content)
-        if self._skip_check(message.author, self.user):
-            return
+    def save_user_data(self, user_data, folder=None):
+        pass
 
-        prefix = await self._get_prefix(message)
-        invoked_prefix = prefix
+    def save_all_user_data(self, folder=None):
+        pass
 
-        if not isinstance(prefix, (tuple, list)):
-            if not view.skip_string(prefix):
-                return
-        else:  # discord.utils.find
-            invoked_prefix = find(view.skip_string, prefix)
-            if invoked_prefix is None:
-                return
 
-        command = None
-        invoker = view.get_word()
-        if message.server is not None:
-            command = self.get_server_data(message.server).command_map.get(invoker, None)
-        namespace = self.namespaces.get(invoker.lower(), self.namespaces.get("none", None))
-        # print(invoker)
-        # print(namespace)
-        tmp = {
-            'bot': self,
-            'invoked_with': invoker,
-            'message': message,
-            'view': view,
-            'prefix': invoked_prefix
-        }
-        ctx = Context(**tmp)
-        del tmp
-
-        if command is None:
-            if not self.collision and not self.separate:
-                command = self.commands.get(invoker, None)
-            if command is None and namespace is not None:
-                view.skip_ws()
-                invoker2 = view.get_word()
-                if invoker2:
-                    ctx.invoked_with = invoker2
-                    command = namespace.get(invoker2, None)
-                    if command is not None:
-                        # remove module name and splice message.content
-                        # this is to prevent confusion to cogs that expect
-                        # the format <prefix> <command> <content>
-                        omit = message.content.index(invoker)
-                        message.content = message.content[:omit].strip() + message.content[omit + len(invoker):].strip()
-
-        if command is not None:
-            self.dispatch("command", command, ctx)
-            try:
-                await command.invoke(ctx)
-            except CommandError as e:
-                ctx.command.dispatch_error(e, ctx)
-            else:
-                self.dispatch('command_completion', command, ctx)
-        elif invoker:
-            exc = CommandNotFound('Command "{}" is not found'.format(invoker))
-            self.dispatch('command_error', exc, ctx)
+def bot_is_nyx(ctx):
+    """Hopefully no one else names their bot subclass Nyx..."""
+    return type(ctx.bot).__name__ == Nyx.__name__
 
 
 if __name__ == "__main__":
@@ -291,4 +382,18 @@ if __name__ == "__main__":
 
     nyx.load_cogs("cogs")
 
-    nyx.run("token")
+
+    @nyx.command()
+    async def asdf(ctx):
+        await ctx.send("fdsa")
+
+
+    nyx_config = ConfigParser()
+    nyx_config.read("info.nyx")
+
+    if "Settings" not in nyx_config:
+        print("Settings not found. Configure your file.")
+    elif "Token" not in nyx_config["Settings"]:
+        print("Token setting not found. Configure your file.")
+    else:
+        nyx.run(nyx_config["Settings"]["Token"])
