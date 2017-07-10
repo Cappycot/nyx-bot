@@ -55,7 +55,8 @@ class Help:
                 for command in disambiguation.values():
                     command_text += nyx.command_disambiguation.format("".join(
                         [ctx.prefix, command.cog_name.lower(), " ",
-                         command.name.lower()]))
+                         command.name.lower()]),
+                        command.help or nyx.command_no_description)
                 await destination.send(command_text)
                 return
             else:

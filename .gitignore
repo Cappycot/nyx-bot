@@ -90,9 +90,9 @@ ENV/
 
 # Nyx Data
 *.nyx
-servers/
+guilds/
 users/
-audio_tmp/
+music/
 
 # Frick PyCharm
 .idea/

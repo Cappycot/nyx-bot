@@ -1,8 +1,11 @@
 """
 Nyx! A (Mostly Unison League themed) bot...
+
 https://discordapp.com/oauth2/authorize?client_id=
 201425813965373440&scope=bot&permissions=8
+
 https://drive.google.com/open?id=0B94jrO7TTwmORFlpeTJ1Z09UVEU
+
 clear; nohup python3 nyx.py >/dev/null &2>1 &
 
 Current Tasks:
@@ -26,10 +29,20 @@ from os import getcwd, listdir
 from os.path import isfile
 
 from discord import ClientException
-from discord.ext.commands import Bot, Command, Context, GroupMixin
+from discord.ext.commands import Bot, Command, CommandError, CommandNotFound, \
+    Context, GroupMixin
 from discord.ext.commands.view import StringView
 
 nyx_config_file = "info.nyx"
+
+
+class CommandHasDisambiguation(CommandError):
+    """Exception raised when a command is attempted to be invoked
+    but the command exists under multiple cogs.
+
+    This does not apply to subcommands.
+    """
+    pass
 
 
 class GuildData:
@@ -139,10 +152,12 @@ class Nyx(Bot):
         self.cogs_folder = None
         # Used to group commands by module name for easy collision resolution.
         self.command_disambiguation = options.pop("command_disambiguation",
-                                                  "```{}```")
+                                                  "```{} - {}```")
         self.command_has_disambiguation = options.pop(
             "command_has_disambiguation",
             'Command "{}" exists in multiple modules as:')
+        self.command_no_description = options.pop("command_no_description",
+                                                  "No description.")
         self.core_commands = {}
         self.disambiguations = {}
         self.lower_cogs = {}
@@ -212,11 +227,12 @@ class Nyx(Bot):
         namespace = self.get_namespace(names[0])
         sub_command = 1
 
+        # Check if neither a command name nor cog name exists for the name.
         if disambiguation is None and namespace is None:
             return None
         elif disambiguation is not None and len(disambiguation) == 1:
-            for val in disambiguation.values():
-                command = val
+            # If only one command bearing the name, then it's safe to select.
+            command = list(disambiguation.values())[0]
 
         if command is None:
             if namespace is None or len(names) < 2:
@@ -272,6 +288,19 @@ class Nyx(Bot):
                     ctx.invoked_with = invoker
                     ctx.command = namespace.get(invoker)
         return ctx
+
+    async def invoke(self, ctx):
+        if ctx.command is not None:
+            await super().invoke(ctx)
+        elif ctx.invoked_with:
+            if self.get_disambiguation(ctx.invoked_with) is None:
+                exc = CommandNotFound(
+                    'Command "{}" is not found'.format(ctx.invoked_with))
+            else:
+                exc = CommandHasDisambiguation(
+                    'Command "{}" exists in multiple cogs'.format(
+                        ctx.invoked_with))
+            self.dispatch("command_error", ctx, exc)
 
     def remove_cog(self, name):
         """The reason I can't just call super here is because removing
