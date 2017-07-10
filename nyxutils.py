@@ -63,19 +63,19 @@ def parse_mention(ctx, mention):
     mention = mention[2:-1]
     if mention.startswith("!"):
         mention = mention[1:]
-    if ctx.message.server is None:
+    if ctx.message.guild is None:
         for user in ctx.message.mentions:
             if user.id == mention:
                 return user
     else:
-        return ctx.message.server.get_member(mention)
+        return ctx.message.guild.get_member(mention)
 
 
 def get_user(ctx, query):
     if query.startswith("<"):
         return parse_mention(ctx, query)
-    elif ctx.message.server is not None:
-        return get_server_member(ctx.message.server, query)
+    elif ctx.message.guild is not None:
+        return get_server_member(ctx.message.guild, query)
     return None
 
 
@@ -117,10 +117,10 @@ def remove_bots(alist, key=lambda a: a):
 
 
 async def respond(ctx, content):
-    if ctx.message.server is None:
-        await ctx.bot.say(content)
+    if ctx.message.guild is None:
+        await ctx.send(content)
     else:
-        await ctx.bot.reply(content)
+        await ctx.send(ctx.message.author.mention + ", " + content)
 
 
 def trim(string):

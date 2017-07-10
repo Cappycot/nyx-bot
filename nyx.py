@@ -3,19 +3,21 @@ Nyx! A (Mostly Unison League themed) bot...
 https://discordapp.com/oauth2/authorize?client_id=
 201425813965373440&scope=bot&permissions=8
 https://drive.google.com/open?id=0B94jrO7TTwmORFlpeTJ1Z09UVEU
+clear; nohup python3 nyx.py >/dev/null &2>1 &
 
 Current Tasks:
  - Rewrite framework to use Discord cogs and stuff...
  - Rewrite task scheduling? (Clocks)
+ - Add "dirty" boolean to Guild/UserData for write back optimization.
  - Conform to Python styling guidelines laid out in PEP 8.
+Future Tasks:
  - Split Nyx up into Nyx and AutoShardedNyx and have original
    be NyxBase...
-Future Tasks:
  - Move all module code on repo to the new Nyx-Modules repo.
  - Figure out GitHub API for automatic code updates?
- - Create thread locks for certain kinds of objects possibly...
 """
 
+import inspect
 import sys
 from configparser import ConfigParser
 from contextlib import closing, redirect_stdout
@@ -23,8 +25,11 @@ from io import StringIO
 from os import getcwd, listdir
 from os.path import isfile
 
+from discord import ClientException
 from discord.ext.commands import Bot, Command, Context, GroupMixin
 from discord.ext.commands.view import StringView
+
+nyx_config_file = "info.nyx"
 
 
 class GuildData:
@@ -41,6 +46,51 @@ class GuildData:
         self.modules = []
         self.prefixes = []
 
+    def check_collision(self, namespace: dict):
+        for name in namespace:
+            if name in self.command_map and self.command_map[name] is not None:
+                return name
+        return None
+
+    def import_module(self, nyx, mod):
+        mod = mod.lower()
+        if mod in self.modules:
+            return False
+        namespace = nyx.get_namespace(mod)
+        if namespace is None:
+            return False
+        if self.check_collision(namespace) is not None:
+            return False
+        self.modules.append(mod)
+        for name in namespace:
+            self.command_map[name] = namespace[name]
+        return True
+
+    def map_commands(self, nyx):
+        self.command_map = {}
+        passed_modules = []
+        for mod in self.modules:
+            namespace = nyx.get_namespace(mod)
+            if namespace is None:
+                continue
+            if self.check_collision(namespace) is not None:
+                continue
+            for name in namespace:
+                self.command_map[name] = namespace[name]
+            passed_modules.append(mod)
+        self.modules = passed_modules
+
+    def deport_module(self, nyx, mod):
+        mod = mod.lower()
+        if mod not in self.modules:
+            return False
+        self.modules.remove(mod)
+        # For the record, I did consider lazy deletion, but there may come a
+        # time in the future when namespaces can be modified, so map_commands
+        # is a good thing to have around.
+        self.map_commands(nyx)
+        return True
+
 
 class UserData:
     """Class for storing specific data for a Discord user.
@@ -48,7 +98,10 @@ class UserData:
     sessions outside of permissions and module-specific data.
     """
 
-    def __init__(self):
+    def __init__(self, user_id: int):
+        # id variable just in case a function references
+        # the id parameter from this type of object.
+        self.id = user_id
         self.data = {"privilege": 1}
 
     @property
@@ -58,7 +111,7 @@ class UserData:
     def get_privilege(self):
         return self.data["privilege"]
 
-    def set_privilege(self, level):
+    def set_privilege(self, level: int):
         self.data["privilege"] = level
 
 
@@ -82,11 +135,17 @@ class Nyx(Bot):
     two commands from differing cogs with the same name if needed.
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, **options):
         self.cogs_folder = None
         # Used to group commands by module name for easy collision resolution.
+        self.command_disambiguation = options.pop("command_disambiguation",
+                                                  "```{}```")
+        self.command_has_disambiguation = options.pop(
+            "command_has_disambiguation",
+            'Command "{}" exists in multiple modules as:')
         self.core_commands = {}
         self.disambiguations = {}
+        self.lower_cogs = {}
         self.namespaces = {}
         self.owner = None
         # Default command prefixes that can be overwritten...
@@ -97,9 +156,14 @@ class Nyx(Bot):
         self.guilds_folder = None
         self.user_data = {}
         self.users_folder = None
-        super().__init__(command_prefix=check_prefix, **kwargs)
+        super().__init__(command_prefix=check_prefix, **options)
 
     def add_cog(self, cog):
+        lower_name = type(cog).__name__.lower()
+        if lower_name in self.lower_cogs:
+            raise ClientException(
+                "The cog {} is already registered.".format(lower_name))
+        self.lower_cogs[lower_name] = cog
         super().add_cog(cog)
 
     def add_command(self, command):
@@ -107,21 +171,26 @@ class Nyx(Bot):
         if not isinstance(command, Command):
             raise TypeError('The command passed must be a subclass of Command')
 
-        if command.name not in self.all_commands:
-            self.all_commands[command.name] = command
+        # If there is already said name/alias occupying the main commands,
+        # then remove it and leave it to be handled by disambiguation.
+        name = command.name.lower()
+        if name not in self.all_commands:
+            self.all_commands[name] = command
             for alias in command.aliases:
+                alias = alias.lower()
                 if alias not in self.all_commands:
                     self.all_commands[alias] = command
                 else:
                     del self.all_commands[alias]
         else:
-            del self.all_commands[command.name]
+            del self.all_commands[name]
 
-        # Add to disambiguations...
-        self.get_disambiguation(command.name, create=True)[
+        # Add as disambiguation...
+        self.get_disambiguation(name, create=True)[
             id(command)] = command
         for alias in command.aliases:
-            self.get_disambiguation(alias, create=True)[id(command)] = command
+            self.get_disambiguation(alias.lower(), create=True)[
+                id(command)] = command
 
         # Add to namespace...
         cog_name = command.cog_name
@@ -131,11 +200,12 @@ class Nyx(Bot):
         else:
             cog_name = cog_name.lower()
         namespace = self.get_namespace(cog_name, create=True)
-        namespace[command.name] = command
+        namespace[name] = command
         for alias in command.aliases:
-            namespace[alias] = command
+            namespace[alias.lower()] = command
 
     def get_command(self, name):
+        """Takes one or two words to get a command."""
         names = name.split()
         command = None
         disambiguation = self.get_disambiguation(names[0])
@@ -151,7 +221,7 @@ class Nyx(Bot):
         if command is None:
             if namespace is None or len(names) < 2:
                 return None
-            command = namespace.get(names[1], None)
+            command = namespace.get(names[1])
             sub_command = 2
 
         if command is not None and isinstance(command, GroupMixin):
@@ -164,35 +234,90 @@ class Nyx(Bot):
 
     async def get_context(self, message, *args, cls=Context):
         ctx = await super().get_context(message, *args, cls=Context)
+        # Make sure the current command is not part of a disambiguation with
+        # multiple commands.
+        if ctx.command is not None:
+            disambiguation = self.get_disambiguation(ctx.invoked_with)
+            if disambiguation is not None and len(disambiguation) > 1:
+                ctx.command = None
+
+        # If no command was found or a disambiguation occurred...
         if ctx.command is None and ctx.prefix is not None:
             # Attempt to grab command
             view = StringView(message.content)
             ctx.view = view
             view.skip_string(ctx.prefix)
 
-            invoker = view.get_word()
+            invoker = view.get_word().lower()
             ctx.invoked_with = invoker
 
             disambiguation = self.get_disambiguation(invoker)
-            if disambiguation is not None:
+            namespace = self.get_namespace(invoker)
+
+            if disambiguation is not None and namespace is None:
                 if len(disambiguation) == 1:
                     for val in disambiguation.values():
                         ctx.command = val
                         return ctx
                 elif len(disambiguation) > 1:
+                    if ctx.guild is not None:
+                        ctx.command = self.get_guild_data(
+                            ctx.guild).command_map.get(ctx.invoked_with)
                     return ctx
 
-            namespace = self.get_namespace(invoker)
             if namespace is not None:
                 view.skip_ws()
-                invoker = view.get_word()
+                invoker = view.get_word().lower()
                 if invoker:
                     ctx.invoked_with = invoker
-                    ctx.command = namespace.get(invoker, None)
+                    ctx.command = namespace.get(invoker)
         return ctx
 
     def remove_cog(self, name):
-        return super().remove_cog(name)
+        """The reason I can't just call super here is because removing
+        commands ideally wants a cog name to go with it because of how
+        disambiguations work."""
+        cog = self.cogs.pop(name, None)
+        self.lower_cogs.pop(name.lower(), None)
+        if cog is None:
+            return cog
+        members = inspect.getmembers(cog)
+        for name, member in members:
+            # remove commands the cog has
+            if isinstance(member, Command):
+                if member.parent is None:
+                    # Our new remove_command function needs the cog name since
+                    # disambiguations are possible.
+                    self.remove_command(member.name, name)
+                continue
+
+            # remove event listeners the cog has
+            if name.startswith('on_'):
+                self.remove_listener(member)
+        try:
+            check = getattr(cog,
+                            '_{0.__class__.__name__}__global_check'.format(
+                                cog))
+        except AttributeError:
+            pass
+        else:
+            self.remove_check(check)
+        try:
+            check = getattr(cog,
+                            '_{0.__class__.__name__}' +
+                            '__global_check_once'.format(cog))
+        except AttributeError:
+            pass
+        else:
+            self.remove_check(check)
+        unloader_name = '_{0.__class__.__name__}__unload'.format(cog)
+        try:
+            unloader = getattr(cog, unloader_name)
+        except AttributeError:
+            pass
+        else:
+            unloader()
+        del cog
 
     def remove_command(self, name, cog=None):
         """Will exterminate the most recently-added command bearing the
@@ -202,10 +327,14 @@ class Nyx(Bot):
         disambiguation = self.get_disambiguation(name)
         if disambiguation is None:
             return None
+
+        # Search for command in the disambiguation.
         command = None
         for cmd in disambiguation.values():
             if cog is None or str(cog) == cmd.cog_name:
                 command = cmd
+
+        # Remove command from namespace if it is found.
         if command is not None:
             namespace = self.get_namespace(str(command.cog_name).lower())
             if namespace is None:
@@ -229,14 +358,19 @@ class Nyx(Bot):
                     namespace.pop(alias)
         return command
 
-    def remove_commands_named(self, name, cog=None):
+    def remove_commands_named(self, name):
         count = 0
-        while self.remove_command(name, cog=cog) is not None:
+        while self.remove_command(name) is not None:
             count += 1
         return count
 
     def walk_commands(self):
-        return super().walk_commands()
+        """Uses disambiguations instead of all_commands."""
+        for disambiguation in tuple(self.disambiguations.values()):
+            for command in tuple(disambiguation.values()):
+                yield command
+                if isinstance(command, GroupMixin):
+                    yield from command.walk_commands()
 
     async def on_ready(self):
         print("Connection established.")
@@ -246,12 +380,14 @@ class Nyx(Bot):
 
     async def loadstring(self, code, ctx):
         """Remote execute code from the Discord client or other sources for
-        debugging. This returns true if the code to execute runs completely 
+        debugging. This returns true if the code to execute runs completely
         without error. This function returns a string with output.
 
         Arguments:
         code - the Python 3 code to run within self
         """
+        if ctx is None:
+            return "No context to run the code in!"
         with closing(StringIO()) as log:
             with redirect_stdout(log):
                 try:
@@ -290,10 +426,10 @@ class Nyx(Bot):
         """
         if discord_guild is None:
             return None
-        # Since both Discord Guild and GuildData have a string id
+        # Since both Discord Guild and GuildData have a integer id
         # parameter, this will still be okay if GuildData is passed.
         # Quack quack.
-        if discord_guild.id not in self.guilds:
+        if discord_guild.id not in self.guild_data:
             guild = GuildData(discord_guild.id)
             self.guild_data[discord_guild.id] = guild
             return guild
@@ -305,7 +441,7 @@ class Nyx(Bot):
             return None
         # Quack quack.
         if discord_user.id not in self.user_data:
-            user = UserData()
+            user = UserData(discord_user.id)
             self.user_data[discord_user.id] = user
         else:
             user = self.user_data[discord_user.id]
@@ -326,50 +462,11 @@ class Nyx(Bot):
                 self.load_extension(mod_path[:-3])
         return True
 
-    def load_guild_data(self, folder=None):
-        if folder is not None:
-            self.guilds_folder = folder
-        if self.guilds_folder is None:
-            return False
-        config = ConfigParser()
-        path = getcwd() + "/" + self.guilds_folder + "/"
-        for guild_path in path:
-            if not isfile(path + guild_path):
-                continue
-            try:
-                guild_data = GuildData(int(guild_path))
-            except ValueError:
-                continue
-            with open(path + guild_path) as file:
-                config.read_file(file)
-                if "Settings" in config:
-                    settings = config["Settings"]
-                    if "Modules" in settings:
-                        guild_data.modules.extend(
-                            settings["Modules"].split(" "))
-                    if "Prefixes" in settings:
-                        guild_data.prefixes.extend(
-                            settings["Prefixes"].split(" "))
-                if "Data" in config:
-                    data = config["Data"]
-                    for key in data:
-                        guild_data.data[key] = data.get(key, None)
-        return True
-
-    def load_user_data(self, folder=None):
-        pass
-
-    def save_guild_data(self, guild_data, folder=None):
-        pass
-
-    def save_all_guild_data(self, folder=None):
-        pass
-
-    def save_user_data(self, user_data, folder=None):
-        pass
-
-    def save_all_user_data(self, folder=None):
-        pass
+    async def reply(self, ctx, content):
+        if ctx.message.guild is None:
+            await ctx.send(content)
+        else:
+            await ctx.send(ctx.message.author.mention + ", " + content)
 
 
 def bot_is_nyx(ctx):
@@ -382,18 +479,14 @@ if __name__ == "__main__":
 
     nyx.load_cogs("cogs")
 
-
-    @nyx.command()
-    async def asdf(ctx):
-        await ctx.send("fdsa")
-
-
     nyx_config = ConfigParser()
-    nyx_config.read("info.nyx")
-
+    nyx_config.read(nyx_config_file)
+    # If the file doesn't exist ConfigParser will just read empty.
     if "Settings" not in nyx_config:
-        print("Settings not found. Configure your file.")
+        print("Settings not found. Configure your " +
+              nyx_config_file + " file.")
     elif "Token" not in nyx_config["Settings"]:
-        print("Token setting not found. Configure your file.")
+        print("Token setting not found. Configure your " +
+              nyx_config_file + " file.")
     else:
         nyx.run(nyx_config["Settings"]["Token"])
