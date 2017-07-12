@@ -2,9 +2,8 @@ import asyncio
 
 from discord.ext import commands
 
-from nyx import bot_is_nyx
 import nyxcommands
-from nyxutils import get_predicate, get_server_member, respond
+from nyxutils import respond
 
 
 class Core:
@@ -12,10 +11,9 @@ class Core:
         self.nyx = nyx
 
     @commands.command(name="privilege", aliases=["rank"], pass_context=True)
-    @commands.check(bot_is_nyx)
     async def check_privilege(self, ctx):
         """Displays your privilege rank."""
-        if self.nyx.is_owner(ctx.message.author):
+        if await self.nyx.is_owner(ctx.message.author):
             privilege = "Owner"
         else:
             privilege = str(
@@ -28,7 +26,6 @@ class Core:
                  privilege, "."]))
 
     @commands.command()
-    @commands.check(bot_is_nyx)
     @commands.is_owner()
     async def exec(self, ctx, *code: str):
         """Remote executes code."""
@@ -51,7 +48,7 @@ class Core:
         """I copy what you say."""
         if ctx.guild is not None and ctx.message.channel.permissions_for(
                 ctx.message.guild.get_member(
-                        self.nyx.user.id)).manage_messages:
+                    self.nyx.user.id)).manage_messages:
             await ctx.message.delete()
         await ctx.send(" ".join(words))
 
@@ -62,15 +59,6 @@ class Core:
         await ctx.send("Light cannot be without dark!!!")
         await asyncio.sleep(1)
         await self.nyx.logout()
-
-    @commands.command()
-    @commands.guild_only()
-    async def whois(self, ctx):
-        test = ctx.message.clean_content.split(" ")
-        test = test[len(test) - 1]
-        if test.startswith("@"):
-            test = test[1:]
-        await ctx.send(str(get_server_member(ctx.message.guild, test)))
 
 
 def setup(bot):

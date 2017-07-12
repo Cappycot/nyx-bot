@@ -1,4 +1,5 @@
-from discord.ext.commands.view import StringView
+from discord.ext.commands import BadArgument
+from discord.ext.commands.converter import MemberConverter
 
 
 def binary_search(array, query, key=lambda a: a, start=0, end=-1):
@@ -35,48 +36,14 @@ def binary_search(array, query, key=lambda a: a, start=0, end=-1):
         return array[mid]
 
 
-def get_predicate(ctx):
-    view = StringView(ctx.message.content)
-    view.skip_string(ctx.prefix + ctx.invoked_with)
-    return view.read_rest().strip()
+member_converter = MemberConverter()
 
 
-def get_server_member(server, query):
-    result = server.get_member(query)
-    query = query.lower()
-    if result is not None:
-        return result
-    for member in server.members:
-        if member.nick and member.nick.lower().startswith(query):
-            return member
-        elif member.name.lower().startswith(query):
-            return member
-    for member in server.members:
-        if member.nick and query in member.nick.lower():
-            return member
-        elif query in member.name.lower():
-            return member
-    return None
-
-
-def parse_mention(ctx, mention):
-    mention = mention[2:-1]
-    if mention.startswith("!"):
-        mention = mention[1:]
-    if ctx.message.guild is None:
-        for user in ctx.message.mentions:
-            if user.id == mention:
-                return user
-    else:
-        return ctx.message.guild.get_member(mention)
-
-
-def get_user(ctx, query):
-    if query.startswith("<"):
-        return parse_mention(ctx, query)
-    elif ctx.message.guild is not None:
-        return get_server_member(ctx.message.guild, query)
-    return None
+async def get_member(ctx, query):
+    try:
+        return await member_converter.convert(ctx, query)
+    except BadArgument:
+        return None
 
 
 # Prints a list in legible format

@@ -498,11 +498,6 @@ class Nyx(Bot):
             await ctx.send(ctx.message.author.mention + ", " + content)
 
 
-def bot_is_nyx(ctx):
-    """Hopefully no one else names their bot subclass Nyx..."""
-    return type(ctx.bot).__name__ == Nyx.__name__
-
-
 if __name__ == "__main__":
     nyx = Nyx()
 

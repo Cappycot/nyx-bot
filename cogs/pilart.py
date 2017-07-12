@@ -1,88 +1,38 @@
-from asyncio import sleep, TimeoutError
 from io import BytesIO
-from random import randint
 
 import aiohttp
-import discord
 from PIL import Image
-from discord import Embed, File
+from discord import File
 from discord.ext import commands
 from discord.ext.commands import BucketType
 
-from nyxutils import get_predicate, get_user, respond
+from nyxutils import get_member, respond
+from os.path import join
+
+elements = ["fire", "water", "wind", "light", "dark", "haste"]
+templates_folder = "pillow"
 
 
-# 5 random :cherry_blossom: appeared! Pick them up by typing >pick
+def get_asset(file_name):
+    return join(templates_folder, file_name)
+
 
 class PILArt:
     def __init__(self, nyx):
         self.nyx = nyx
 
     @commands.command()
-    async def fakeflower(self, ctx):
-        """heh"""
-        disabled = False
-        if disabled:
-            author = ctx.message.author
-            avatar = author.default_avatar_url if \
-                not author.avatar else author.avatar_url
-            embed = Embed(
-                description=(author.display_name + " tried to use " +
-                             "fakeflower...\nWhat a fool! :joy:"))
-            embed.set_author(name=author.display_name, icon_url=avatar)
-            embed.colour = discord.Color.green()
-            await ctx.send(embed=embed)
-            return
-
-        # old code
-        manageable = ctx.message.channel.permissions_for(
-            ctx.message.guild.get_member(self.nyx.user.id)).manage_messages
-        if manageable:
-            await ctx.message.delete()
-        else:
-            await sleep(randint(60, 120))
-        await sleep(randint(120, 300))
-
-        def latch(m):
-            return m.channel == ctx.message.channel
-
-        await self.nyx.wait_for("message", check=latch)
-        flower_file = open("img" + str(randint(1, 3)) + ".jpg", "rb")
-        bait = await ctx.send(
-            "5 random :cherry_blossom: appeared! " +
-            "Pick them up by typing ``>pick``",
-            file=File(flower_file))
-
-        def fooled(m):
-            return m.content == ">pick" and m.channel == ctx.message.channel
-
-        try:
-            fool = await self.nyx.wait_for("message", check=fooled,
-                                           timeout=60)
-            await bait.delete()
-            if fool is None:
-                return
-            elif manageable:
-                await fool.delete()
-            author = fool.author
-            avatar = author.default_avatar_url if not author.avatar \
-                else author.avatar_url
-            embed = Embed(
-                description=(author.display_name +
-                             " picked 0 :cherry_blossom:" +
-                             "\nWhat a fool! :joy:"))
-            embed.set_author(name=author.display_name, icon_url=avatar)
-            embed.colour = discord.Color.green()
-            await ctx.send(embed=embed)
-        except TimeoutError:
-            await bait.delete()
-
-    @commands.command()
     @commands.bot_has_permissions(send_messages=True, attach_files=True)
     @commands.cooldown(1, 5, BucketType.user)
-    async def fear(self, ctx):
+    async def fear(self, ctx, user: str = None):
         """For when you fear someone or yourself..."""
-        tofear = get_user(ctx, get_predicate(ctx)) or ctx.message.author
+        tofear = ctx.message.author
+        if user is not None:
+            tofear = await get_member(ctx, user)
+            if tofear is None:
+                await respond(ctx, "I dun know who you are talking about...")
+                ctx.command.reset_cooldown(ctx)
+                return
         url = tofear.avatar_url
         if not url:
             url = tofear.default_avatar_url
@@ -94,7 +44,7 @@ class PILArt:
             if req.status == 200:
                 imfile = BytesIO(await req.read())
                 tofear = Image.open(imfile).convert("RGBA")
-                backdrop = Image.open("NoFearOneFear.png")
+                backdrop = Image.open(get_asset("NoFearOneFear.png"))
 
                 # Presets for image creation
                 avatarside = 240
@@ -117,7 +67,7 @@ class PILArt:
                     msg = ctx.message.author.mention + ", w" + msg[1:]
                 await ctx.send(msg,
                                file=File(imfile,
-                                         filename="nofearonefear.png"))
+                                         filename="Fear.png"))
                 imfile.close()
             else:
                 await respond(ctx, "Image loading failed! :<")
@@ -125,15 +75,19 @@ class PILArt:
     @commands.command(aliases=["destroy"])
     @commands.bot_has_permissions(send_messages=True, attach_files=True)
     @commands.cooldown(1, 5, BucketType.user)
-    async def obliterate(self, ctx, victim):
+    @commands.guild_only()
+    async def obliterate(self, ctx, victim: str):
         """For when you really hate someone..."""
-        victim = get_user(ctx, victim)
+        victim = await get_member(ctx, victim)
         if victim is None:
             await respond(ctx, "We couldn't get a target, sir!")
+            ctx.command.reset_cooldown(ctx)
         elif victim == self.nyx.user:
             await respond(ctx, "I'm your gunner... moron.")
+            ctx.command.reset_cooldown(ctx)
         elif victim == ctx.message.author:
             await respond(ctx, "What? Do you have crippling depression?")
+            ctx.command.reset_cooldown(ctx)
         else:
             shooter = ctx.message.author
             # Get urls for profile pics
@@ -151,7 +105,7 @@ class PILArt:
             # Make http request for profile pictures and get background tank
             async with ctx.message.channel.typing(), aiohttp.ClientSession(
                     loop=self.nyx.loop) as session, session.get(
-                    url1) as req1, session.get(url2) as req2:
+                url1) as req1, session.get(url2) as req2:
                 # async with session.get(url1) as req1:
                 if req1.status == 200 and req2.status == 200:
                     imfile = BytesIO(await req1.read())
@@ -159,7 +113,7 @@ class PILArt:
                     imfile = BytesIO(await req2.read())
                     victim = Image.open(imfile)
                     # TODO: Figure out image directories
-                    backdrop = Image.open("Obliterate.png")
+                    backdrop = Image.open(get_asset("Obliterate.png"))
 
                     # Paste shooter on top of tank as resized image
                     shooter = shooter.resize(
@@ -205,10 +159,71 @@ class PILArt:
                               ", a" + msg[1:]
                     await ctx.send(
                         msg, file=File(imfile,
-                                       filename="bwaarp.png"))
+                                       filename="Bwaarp.png"))
                     imfile.close()
                 else:
                     await respond(ctx, "Image loading failed! :<")
+
+    @commands.command(aliases=["sr"])
+    @commands.bot_has_permissions(send_messages=True, attach_files=True)
+    @commands.cooldown(1, 5, BucketType.user)
+    async def ur(self, ctx, element: str, user: str = None):
+        """Creates a UR monster of yourself or another user.
+        Credit to Bevgebra for the templates...
+        """
+        ele = None
+        element = element.lower()
+        for thing in elements:
+            if thing in element.lower():
+                ele = thing
+                break
+        if ele is None:
+            await respond(ctx, "Invalid element!")
+            ctx.command.reset_cooldown(ctx)
+            return
+        else:
+            element = ele[:1].upper() + ele[1:]
+        if user is not None:
+            user = await get_member(ctx, user)
+            if user is None:
+                await respond(ctx, "I dun know who you are talking about...")
+                ctx.command.reset_cooldown(ctx)
+                return
+        else:
+            user = ctx.message.author
+        rarity = ctx.invoked_with.upper()
+        url = user.avatar_url
+        if not url:
+            url = user.default_avatar_url
+
+        async with ctx.message.channel.typing(), aiohttp.ClientSession(
+                loop=self.nyx.loop) as session, session.get(url) as req:
+            if req.status == 200:
+                imfile = BytesIO(await req.read())
+                img = Image.open(imfile)
+                snum = 5
+                ednum = snum + 426
+                base = Image.open(get_asset(rarity + "Base.png"))
+                over = Image.open(
+                    get_asset(rarity + "Overlay" + element + ".png"))
+                img = img.resize((426, 426), Image.LANCZOS)
+                mask = img if "RGBA" in img.mode else None
+                base.paste(img, (snum, snum, ednum, ednum), mask=mask)
+                base.paste(over, mask=over)
+
+                # Save in-memory filestream and send to Discord
+                imfile = BytesIO()
+                base.save(imfile, format="png")
+                # Move pointer to beginning so Discord can read pic.
+                imfile.seek(0)
+                msg = "New monster released in Unison League!"
+                if ctx.guild is not None:
+                    msg = ctx.message.author.mention + ", n" + msg[1:]
+                await ctx.send(msg,
+                               file=File(imfile, filename=rarity + ".png"))
+                imfile.close()
+            else:
+                await respond(ctx, "Image loading failed! :<")
 
 
 def setup(bot):
