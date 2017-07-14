@@ -27,7 +27,7 @@ class Core:
 
     @commands.command()
     @commands.is_owner()
-    async def exec(self, ctx, *code: str):
+    async def exec(self, ctx, *code):
         """Remote executes code."""
         code = " ".join(code)
         if code.startswith("```Python"):

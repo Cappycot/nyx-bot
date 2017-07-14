@@ -4,7 +4,7 @@ from configparser import ConfigParser, ParsingError
 from discord.ext import commands
 from nyx import GuildData
 import nyxcommands
-from nyxutils import list_string
+from nyxutils import list_string, respond
 from os import getcwd, listdir
 from os.path import isfile, join
 
@@ -93,55 +93,62 @@ class Guild:
         for gid in self.nyx.guild_data:
             self.save_guild_data(gid)
 
-    @commands.command(aliases=["modules"])
-    @commands.guild_only()
-    async def module(self, ctx, action=None, *modules):
+    @commands.group(aliases=["modules"])
+    async def module(self, ctx):
         """List, add, or remove modules from a server."""
-        add = False
-        remove = False
-        if action is not None:
-            add = any(action == a for a in module_add_alias)
-            remove = not add and any(action == a for a in module_rem_alias)
+        pass
+
+    @module.command(name="add")
+    @commands.guild_only()
+    @nyxcommands.has_privilege_or_permissions(privilege=-1, manage_server=True)
+    async def module_add(self, ctx, *modules):
+        if len(modules) == 0:
+            await self.nyx.reply(ctx,
+                                 "You didn't tell me what modules to add!")
+            return
         guild_data = self.nyx.get_guild_data(ctx.message.guild)
-        if add or remove:
-            if is_manager(ctx):
-                if len(modules) == 0:
-                    await self.nyx.reply(ctx,
-                                         "You didn't tell me what modules " +
-                                         "to " + (
-                                             "add!" if add else "remove!"))
-                    return
-                changed = []
-                for mod in modules:
-                    if add and guild_data.import_module(self.nyx, mod):
-                        changed.append(mod)
-                    elif remove and guild_data.deport_module(self.nyx, mod):
-                        changed.append(mod)
-                if len(changed) == 0:
-                    if add:
-                        await self.nyx.reply(ctx,
-                                             "Either the modules were " +
-                                             "already added or I couldn't " +
-                                             "find them...")
-                    else:
-                        await self.nyx.reply(ctx, "I couldn't find such a " +
-                                             "module to remove.")
-                else:
-                    self.save_guild_data(guild_data.id)
-                    result = ("Added" if add else "Removed") + " module(s) "
-                    result += list_string(changed)
-                    await self.nyx.reply(ctx, result)
-            else:
-                await self.nyx.reply(ctx, "You don't have permission to " +
-                                     "change this guild's modules.")
-        elif len(guild_data.modules) == 0:
-            await self.nyx.reply(ctx, "This guild has no modules imported...")
+        changed = []
+        for mod in modules:
+            if guild_data.import_module(self.nyx, mod):
+                changed.append(mod)
+        if len(changed) == 0:
+            await self.nyx.reply(ctx, " ".join(["Either the modules were",
+                                                "already added or I couldn't",
+                                                "find them..."]))
         else:
-            plural = len(guild_data.modules) > 1
-            result = list_string(guild_data.modules)
-            await self.nyx.reply(ctx, "Module" + (
-                "s" if plural else "") + " for this server " +
-                                 ("are " if plural else "is ") + result)
+            self.save_guild_data(guild_data.id)
+            await respond(ctx, "Added module(s)" + list_string(changed))
+
+    @module.command(name="list")
+    @commands.guild_only()
+    async def module_list(self, ctx):
+        guild_data = self.nyx.get_guild_data(ctx.message.guild)
+        plural = len(guild_data.modules) > 1
+        result = list_string(guild_data.modules)
+        await self.nyx.reply(ctx, "".join(["Module", "s" if plural else "",
+                                           " for this server ",
+                                           "are " if plural else "is ",
+                                           result]))
+
+    @module.command(name="remove")
+    @commands.guild_only()
+    @nyxcommands.has_privilege_or_permissions(privilege=-1, manage_server=True)
+    async def module_remove(self, ctx, *modules):
+        if len(modules) == 0:
+            await self.nyx.reply(ctx,
+                                 "You didn't tell me what modules to remove!")
+            return
+        guild_data = self.nyx.get_guild_data(ctx.message.guild)
+        changed = []
+        for mod in modules:
+            if guild_data.deport_module(self.nyx, mod):
+                changed.append(mod)
+        if len(changed) == 0:
+            await self.nyx.reply(ctx, " ".join(
+                ["I couldn't find such a", "module to remove."]))
+        else:
+            self.save_guild_data(guild_data.id)
+            await respond(ctx, "Removed module(s)" + list_string(changed))
 
     @commands.command(aliases=["prefixes"])
     @commands.guild_only()

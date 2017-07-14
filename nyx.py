@@ -269,6 +269,9 @@ class Nyx(Bot):
 
             disambiguation = self.get_disambiguation(invoker)
             namespace = self.get_namespace(invoker)
+            # We'll need to affix the namespace name to the prefix if we get
+            # a working command to invoke.
+            namespace_name = invoker
 
             if disambiguation is not None and namespace is None:
                 if len(disambiguation) == 1:
@@ -285,8 +288,9 @@ class Nyx(Bot):
                 view.skip_ws()
                 invoker = view.get_word().lower()
                 if invoker:
-                    ctx.invoked_with = invoker
                     ctx.command = namespace.get(invoker)
+                    ctx.invoked_with = invoker
+                    ctx.prefix += namespace_name + " "
         return ctx
 
     async def invoke(self, ctx):
