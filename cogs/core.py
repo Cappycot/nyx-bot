@@ -1,6 +1,7 @@
 import asyncio
 
 from discord.ext import commands
+from discord.ext.commands.view import StringView
 
 import nyxcommands
 from nyxutils import respond
@@ -27,11 +28,20 @@ class Core:
 
     @commands.command()
     @commands.is_owner()
-    async def exec(self, ctx, *code):
+    async def exec(self, ctx, code):
         """Remote executes code."""
-        code = " ".join(code)
-        if code.startswith("```Python"):
+        py_start = code.lower().startswith("```py")
+        python_start = py_start and code.lower().startswith("```python")
+        view = StringView(ctx.message.content)
+        view.skip_string(ctx.prefix)
+        view.skip_ws()
+        view.skip_string(ctx.invoked_with)
+        view.skip_ws()
+        code = view.read_rest()
+        if python_start:
             code = code[9:]
+        elif py_start:
+            code = code[5:]
         elif code.startswith("```"):
             code = code[3:]
         if code.endswith("```"):
@@ -44,7 +54,7 @@ class Core:
 
     @commands.command()
     @nyxcommands.has_privilege(privilege=-1)
-    async def echo(self, ctx, *words: str):
+    async def echo(self, ctx, *words):
         """I copy what you say."""
         if ctx.guild is not None and ctx.message.channel.permissions_for(
                 ctx.message.guild.get_member(

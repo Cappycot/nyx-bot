@@ -1,3 +1,9 @@
+"""
+I eat factorials for breakfast, lunch, and dinner. To feed me one, type in a
+number followed by '!' an exclamation mark. I'll heartily digest it and give
+you the result!
+"""
+
 from discord.ext import commands
 
 from math import ceil, factorial, floor, log, pi
@@ -74,9 +80,9 @@ def locate_numbers(string):
 async def on_message(message):
     if message.author.bot:
         return
-    nums = locate_numbers(message.content)
-    guild = message.guild
+    nums = [] # locate_numbers(message.content)
     if len(nums) > 0:
+        guild = message.guild
         oh_no = "You've uttered "
         if guild is not None:
             name = message.author.nick or message.author.name
@@ -100,10 +106,7 @@ class Factorial:
 
     @commands.command()
     async def factorial(self, ctx, number: int):
-        """I eat factorials for breakfast, lunch, and dinner. To feed me one,
-        type in a number followed by '!' an exclamation mark. I'll heartily
-        digest it and give you the result!
-        """
+        """Calculates the factorial of a given number."""
         await respond(ctx, "".join([str(number), get_factorial(["", number])]))
 
 

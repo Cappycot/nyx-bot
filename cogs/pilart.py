@@ -195,6 +195,7 @@ class PILArt:
         url = user.avatar_url
         if not url:
             url = user.default_avatar_url
+        print(url)
 
         async with ctx.message.channel.typing(), aiohttp.ClientSession(
                 loop=self.nyx.loop) as session, session.get(url) as req:
