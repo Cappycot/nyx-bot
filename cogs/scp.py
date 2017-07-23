@@ -1,17 +1,20 @@
 """
 Secure, Contain, Protect
 
-This module requires Beautiful Soup 4.X.X to run!
+This module requires Beautiful Soup 4.X.X and PIL 4.X.X to run!
 """
 
-from aiohttp import ClientSession
-from bs4 import BeautifulSoup, Tag
-from discord import Color, Embed
-from discord.ext import commands
-from discord.ext.commands import BucketType
+from io import BytesIO
 from os import mkdir
 from os.path import isdir, join
 from re import compile, search
+
+from PIL import Image, ImageDraw, ImageFont
+from aiohttp import ClientSession
+from bs4 import BeautifulSoup, Tag
+from discord import Color, Embed, File
+from discord.ext import commands
+from discord.ext.commands import BucketType
 
 # Name of the directory to be used to store things...
 folder = "scp"
@@ -23,6 +26,13 @@ series_range = (highest_scp + 1) // 1000
 titles = {(i + 1): None for i in range(highest_scp)}
 
 
+# TODO: Check titles for:
+# 2565
+# 2769
+# 2864
+# 2930
+# 2956
+
 def read_component(thing):
     if isinstance(thing, Tag):
         if thing.name == "em":
@@ -33,6 +43,9 @@ def read_component(thing):
             return "__" + read_component(thing.next_element) + "__"
         elif thing.attrs.get("style") == "text-decoration: line-through;":
             return "~~" + read_component(thing.next_element) + "~~"
+        elif thing.attrs.get("id") is not None and "footnoteref" in \
+                thing.attrs["id"]:
+            return ""
         else:
             return read_component(thing.next_element)
     else:
@@ -44,14 +57,6 @@ def fetch_level(element, limit=1024):
     parts = []
     if element is None:
         return "[DATA ERROR]"
-    # component = read_component(element)
-    # if component:
-    # length = len(component)
-    # If one paragraph is more than 1024 characters maybe the SCP isn't
-    # worth reading lol
-    # if length > limit:
-    # return "[WITHHELD]"
-    # parts.append(component)
     for thing in [element] + list(element.next_siblings):
         # component = read_component(thing)
         if isinstance(thing, Tag):
@@ -63,6 +68,9 @@ def fetch_level(element, limit=1024):
                 component = "__" + fetch_level(thing.next_element) + "__"
             elif thing.attrs.get("style") == "text-decoration: line-through;":
                 component = "~~" + fetch_level(thing.next_element) + "~~"
+            elif thing.attrs.get("id") is not None and "footnoteref" in \
+                    thing.attrs["id"]:
+                return ""
             else:
                 component = fetch_level(thing.next_element)
         else:
@@ -172,15 +180,20 @@ async def parse_scp(ctx, number: str, post_image=False):
 
             # Color the embed based on class...
             object_class = object_class.lower()
-            if search("safe$", object_class):
+            if search("safe$", object_class) or search("safe[^~]+",
+                                                       object_class):
                 embed.colour = Color.green()
-            elif search("euclid$", object_class):
+            elif search("euclid$", object_class) or search("euclid[^~]+",
+                                                           object_class):
                 embed.colour = Color.gold()
-            elif search("keter$", object_class):
+            elif search("keter$", object_class) or search("keter[^~]+",
+                                                          object_class):
                 embed.colour = Color.red()
-            elif search("thaumiel$", object_class):
+            elif search("thaumiel$", object_class) or search("thaumiel[^~]+",
+                                                             object_class):
                 embed.colour = Color.blue()
-            elif search("apollyon$", object_class):
+            elif search("apollyon$", object_class) or search("apollyon[^~]+",
+                                                             object_class):
                 embed.colour = Color.red()
 
             # Fetch the containment procedures and description...
@@ -223,6 +236,45 @@ async def parse_scp(ctx, number: str, post_image=False):
 class SCP:
     def __init__(self, bot):
         self.bot = bot
+
+    @commands.command(name="ohno", aliases=["3078", "SCP3078", "SCP-3078"])
+    @commands.bot_has_permissions(send_messages=True, attach_files=True)
+    @commands.cooldown(1, 5, BucketType.user)
+    async def oh_no(self, ctx, *words):
+        """Generates your very own SCP-3078 cognitohazardous shitpost.
+
+        when you inhale the devil's mary jane smoke
+        """
+        # Damn I tried to imitate the SCP-3078 instances but they don't follow
+        # the same layout in different imitations, so the first one is followed
+        # the best here.
+        font = ImageFont.truetype("arial.ttf", 18)
+        append = None
+        width = 260
+        x_start = 20
+        y_cur = 12
+        y_pad = 2
+        image = Image.open(join(folder, "SCP-3078.png"))
+        draw = ImageDraw.Draw(image)
+        for word in words:
+            if append is None:
+                append = word
+            else:
+                prev = append
+                append = " ".join([append, word])
+                w, h = draw.textsize(append, font=font)
+                if w > width:
+                    append = word
+                    draw.text((x_start, y_cur), prev, fill=(0, 0, 0),
+                              font=font)
+                    y_cur += h + y_pad
+        if append is not None:
+            draw.text((x_start, y_cur), append, fill=(0, 0, 0), font=font)
+        image_bytes = BytesIO()
+        image.save(image_bytes, format="png")
+        image_bytes.seek(0)
+        await ctx.send(file=File(image_bytes, filename="SCP-3078.png"))
+        image_bytes.close()
 
     @commands.command()
     @commands.cooldown(1, 5, BucketType.user)
