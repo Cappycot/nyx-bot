@@ -1,0 +1,71 @@
+[Augment Quests]
+daily = false
+disabled = false
+file = LV.dat
+id = LV
+utc = true
+
+[Eggs & Kesapasa]
+daily = false
+disabled = false
+file = EP.dat
+id = EP
+utc = true
+
+[Eggs & Keymin]
+daily = false
+disabled = false
+file = EK.dat
+id = EK
+utc = true
+
+[Glorious Kesapasa]
+daily = false
+disabled = false
+file = GP.dat
+# Fuck G stands for gold LOL
+id = PP
+utc = true
+
+[Keymin & Kesapasa]
+daily = false
+disabled = false
+file = KP.dat
+id = KP
+utc = true
+
+[Super Augment Quests]
+daily = false
+disabled = false
+file = SL.dat
+id = SL
+utc = true
+
+[Super Gold Quests]
+daily = false
+disabled = false
+file = SG.dat
+id = SG
+utc = true
+
+[Guild Battle A]
+daily = false
+disabled = false
+file = BA.dat
+id = BA
+utc = false
+
+[Guild Battle B]
+daily = false
+disabled = false
+file = BB.dat
+id = BB
+utc = false
+
+[Guild Battle C]
+daily = false
+disabled = false
+file = BC.dat
+id = BC
+utc = false
+

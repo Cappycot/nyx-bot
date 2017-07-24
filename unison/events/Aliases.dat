@@ -1,0 +1,27 @@
+# List of keyword to code conversions...
+# E - Eggs
+# G - Gold
+# K - Keymin
+# L - Augments
+# M - Special Events
+# P - Kesapasa
+# S - Super
+
+[Aliases]
+SG = gold
+SL = super aug
+S = super
+E,K,P = reforge
+EP = eggs and kes;eggs and p
+EK = eggs and key
+KP = keymin and k
+E = egg
+K = key
+P = kesa;pasa;passa;cloud;glo
+LV = aug
+BA = b a;battle a;gba
+BB = b b;battle b;gbb
+BC = b c;battle c;gbc
+B = guild;gb
+MC = colo;cancer
+MO = mob;path
