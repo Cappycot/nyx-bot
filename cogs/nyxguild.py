@@ -1,18 +1,18 @@
 """Default loader for guild-specific data."""
 
 from configparser import ConfigParser, ParsingError
-from discord.ext import commands
-from nyx import GuildData
-import nyxcommands
-from nyxutils import list_string, respond
 from os import getcwd, listdir
 from os.path import isfile, join
+
+from discord.ext import commands
+
+import nyxcommands
+from nyx import GuildData
+from nyxutils import list_string, respond
 
 default_folder = "guilds"
 is_manager = nyxcommands.has_privilege_or_permissions(privilege=-1,
                                                       manage_server=True)
-module_add_alias = ["a", "add", "i", "import"]
-module_rem_alias = ["d", "del", "deport", "r", "rem", "remove"]
 prefix_add_alias = ["a", "add"]
 prefix_rem_alias = ["d", "del", "r", "rem", "remove"]
 
@@ -98,10 +98,11 @@ class Guild:
         """List, add, or remove modules from a server."""
         pass
 
-    @module.command(name="add")
+    @module.command(name="add", aliases=["a", "i", "import"])
     @commands.guild_only()
     @nyxcommands.has_privilege_or_permissions(privilege=-1, manage_server=True)
     async def module_add(self, ctx, *modules):
+        """Adds modules to the server."""
         if len(modules) == 0:
             await self.nyx.reply(ctx,
                                  "You didn't tell me what modules to add!")
@@ -122,6 +123,7 @@ class Guild:
     @module.command(name="list")
     @commands.guild_only()
     async def module_list(self, ctx):
+        """Lists the modules on the server."""
         guild_data = self.nyx.get_guild_data(ctx.message.guild)
         plural = len(guild_data.modules) > 1
         result = list_string(guild_data.modules)
@@ -130,10 +132,11 @@ class Guild:
                                            "are " if plural else "is ",
                                            result]))
 
-    @module.command(name="remove")
+    @module.command(name="remove", aliases=["d", "del", "deport", "r", "rem"])
     @commands.guild_only()
     @nyxcommands.has_privilege_or_permissions(privilege=-1, manage_server=True)
     async def module_remove(self, ctx, *modules):
+        """Removes modules from the server."""
         if len(modules) == 0:
             await self.nyx.reply(ctx,
                                  "You didn't tell me what modules to remove!")

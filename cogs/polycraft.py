@@ -15,6 +15,8 @@ from threading import Thread
 class ServerPingThread(Thread):
     """We need crappy multithreading here because Dinnerbone doesn't write
     his stuff using async and everything gets blocked...
+
+    This represents a short-lived thread for getting information once.
     """
 
     def __init__(self, address: str, port: int = 25565,
@@ -67,7 +69,8 @@ class Polycraft:
 
     @commands.command()
     @commands.cooldown(1, 5, BucketType.user)
-    async def check(self, ctx, timeout: int = 3):
+    async def servers(self, ctx, timeout: int = 3):
+        """Gets the current status of the Polycraft servers."""
         if timeout < 1:
             timeout = 1
         async with ctx.message.channel.typing():
