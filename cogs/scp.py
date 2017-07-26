@@ -26,12 +26,66 @@ series_range = (highest_scp + 1) // 1000
 titles = {(i + 1): None for i in range(highest_scp)}
 
 
+def SCP_2521(embed: Embed):
+    embed.colour = Color.red()
+    return "Are you trying to get me killed?!?"
+
+
+def SCP_2602(embed: Embed):
+    """Did you know this thing used to be a library?"""
+    embed.set_field_at(0, name="Library Class:", value="Former")
+    embed.title = "SCP-2602, which used to be a library"
+
+
 # TODO: Check titles for:
 # 2565
-# 2769
+# 2769 (61231)
 # 2864
 # 2930
 # 2956
+
+def SCP_2565(embed: Embed):
+    embed.colour = Color.red()
+    embed.description = "Allison Eckhart"
+    embed.set_field_at(0, name="Allison Eckhart Class:", value="Keter")
+
+
+def SCP_61231(embed: Embed):
+    """SCP-2769: It's a really shitty implementation of some infohazard and I
+    don't really feel like figuring the thing out. Seriously.
+    """
+    embed.description = "An Honest Buck"
+    url = "".join(["http://scp-wiki.wdfiles.com/local-",
+                   "-files/scp-2769/1280px-Cardisoma_armatus-front.jpg"])
+    embed.set_image(url=url)
+    embed.title = "SCP-61231"
+
+
+def SCP_2864(embed: Embed):
+    embed.description = "Di Molte Voci"
+
+
+def SCCP_2930(embed: Embed):
+    """SCP-2930, except with most of the letter c c being repeated LOL"""
+    object_class = embed.fields[0].value
+    embed.description = "Cross City City City City Hall"
+    embed.set_field_at(0, name="Object Class Class:", value=object_class)
+    containment = embed.fields[1].value
+    embed.set_field_at(1, name="Special Containment Containment Procedures:",
+                       value=containment)
+    embed.title = "SCCP-2930"
+
+
+def SCP_2956(embed: Embed):
+    embed.description = "A film by SCP-2956, products of Natura Toys."
+    embed.title = "TriStar Pictures"
+
+
+hard_code_specials = {"SCP-2521": SCP_2521, "SCP-2602": SCP_2602,
+                      "SCP-2565": SCP_2565, "SCP-2769": SCP_61231,
+                      "SCP-2864": SCP_2864, "SCP-2930": SCCP_2930,
+                      "SCP-2956": SCP_2956}
+
 
 def read_component(thing):
     if isinstance(thing, Tag):
@@ -158,7 +212,7 @@ async def parse_scp(ctx, number: str, post_image=False):
 
             # Get the SCP class...
             object_class = source.find(
-                string=compile("Object Class[:]?$")) or source.find(
+                string=compile("Object (Class[ ]?)+[:]?$")) or source.find(
                 string=compile("Classification[:]?$"))
             # If you're the person who uses "Classification" f*ck off pls...
             if object_class is None:
@@ -198,7 +252,7 @@ async def parse_scp(ctx, number: str, post_image=False):
 
             # Fetch the containment procedures and description...
             containment = source.find(
-                string=compile("Special Containment Procedure[s]?[:]?$"))
+                string=compile("Special (Containment )+Procedure[s]?[:]?$"))
             if containment is None or containment.next_element is None:
                 containment = "[DATA ERROR]"
             else:
@@ -224,7 +278,13 @@ async def parse_scp(ctx, number: str, post_image=False):
                     image = image.get("src")
                     if image is not None:
                         embed.set_image(url=image)
-            await ctx.send(embed=embed)
+
+            # Post-processing embed...
+            addendum = None
+            process = hard_code_specials.get("SCP-" + number)
+            if process is not None:
+                addendum = process(embed)
+            await ctx.send(addendum, embed=embed)
         elif req.status == 404:
             await ctx.send(
                 "Such an SCP is either classified or does not exist...")
