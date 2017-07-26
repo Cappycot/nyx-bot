@@ -2,7 +2,6 @@
 # These are all listed in UTC format.
 # EST is 5 hours behind while EDT is 4 behind.
 
-10100-10300
 10600-10700
 11300-11500
 12100-12300
@@ -33,4 +32,4 @@
 70400-70600
 70600-70800
 71700-71900
-
+10100-10300
