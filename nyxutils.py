@@ -85,13 +85,13 @@ def remove_bots(alist, key=lambda a: a):
 
 async def reply(ctx, content):
     if ctx.message.guild is None:
-        await ctx.send(content)
+        return await ctx.send(content)
     else:
-        await ctx.send("{}, {}".format(ctx.author.mention, content))
+        return await ctx.send("{}, {}".format(ctx.author.mention, content))
 
 
 async def respond(ctx, content):
-    await reply(ctx, content)
+    return await reply(ctx, content)
 
 
 def trim(string):
