@@ -1,24 +1,31 @@
 """
-I've forever given up on optimizing the Unison League events timers, as
-the old code is too much trouble to optimize at this point. Thus, I port
-and implement UTC timing with as little effort as possible. :<
+I've forever given up on optimizing the Unison League events timers, as the old
+code is too much trouble to optimize at this point. Thus, I will port and
+implement UTC timing with as little effort as possible. :<
 """
 
+from asyncio import sleep
 from configparser import ConfigParser
 from datetime import datetime
-from os.path import join
+from os import listdir, mkdir
+from os.path import isdir, isfile, join
 
 from discord.ext import commands
 
-from nyxutils import respond
+from nyxutils import list_string, reply
 
 folder = "unison"
 events_folder = "events"
 aliases_file = "Aliases.dat"
 events_file = "Events.dat"
 remind_folder = "reminders"
+reminder_type = ".rem"
 aliases = {}
 events = {}
+# Dictionary of {uid:{time:{code:boolean}}}
+# Code-boolean pairings indicate if (True) continuous reminder or if
+# it's (False) a one-time reminder.
+reminders = {}
 days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 days_full = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
              "Saturday", "Sunday"]
@@ -31,12 +38,6 @@ class Event:
         self.disabled = disabled
         self.times = []  # Array of EventTime
         self.utc = utc
-
-    def find(self, time, utc_time):
-        pass
-
-    def find_next(self, time, utc_time):
-        pass
 
 
 class EventTime:
@@ -78,9 +79,14 @@ def sub_utc(time, offset):
     return time
 
 
-def delta(time1: int, time2):
+def delta(time1: int, time2: int):
     """Gets the difference between two five-digit format times."""
-    if time2 < time1:  # Weekly rollover
+    if time1 < 10000 or time2 < 10000:
+        time1 %= 10000
+        time2 %= 10000
+        if time2 < time1:
+            time2 += 2400
+    elif time2 < time1:  # Weekly rollover
         time2 += 70000
     elif time2 >= 80000:
         time2 -= 70000
@@ -93,19 +99,19 @@ def delta(time1: int, time2):
     if hour_diff < 0:
         hour_diff += 24
         day_diff -= 1
-    return [day_diff, hour_diff, minute_diff]
+    return day_diff, hour_diff, minute_diff
 
 
-def delta_string(time1: int, time2):
+def delta_string(time1: int, time2: int):
     """Gives the difference between five digit format times in readable
     form.
     """
-    dt = delta(time1, time2)
+    day, hour, minute = delta(time1, time2)
     result = ""
-    if dt[0] > 0:
-        result += str(dt[0]) + " day" + ("s, " if dt[0] != 1 else ", ")
-    result += str(dt[1]) + " hour" + ("s and " if dt[1] != 1 else " and ")
-    result += str(dt[2]) + " minute" + ("s" if dt[2] != 1 else "")
+    if day > 0:
+        result += str(day) + " day" + ("s, " if day != 1 else ", ")
+    result += str(hour) + " hour" + ("s and " if hour != 1 else " and ")
+    result += str(minute) + " minute" + ("s" if minute != 1 else "")
     return result
 
 
@@ -163,8 +169,8 @@ def get_full_name(key):
 
 def get_key(string):
     for key in aliases:
-        if any(a in string for a in aliases[key]) or string in key:
-            return key
+        if any(a in string for a in key[1]) or string in key[0]:
+            return key[0]
     return None
 
 
@@ -264,10 +270,42 @@ def find_events(keys, time, day, utc_offset):
     return results
 
 
+def find_next_events(keys, time, day, utc_offset):
+    results = []
+    if time < 10000 and day != -1:
+        if time != -1:
+            time += day * 10000
+        else:
+            time = day * 10000
+    for eid in events:
+        if not events[eid].disabled and letter_match(keys, eid):
+            next_time = None
+            min_day = -1
+            min_hour = -1
+            min_min = -1  # lol min min wtf
+            for e_time in events[eid].times:
+                start_time = e_time.start
+                if e_time.utc:
+                    start_time = sub_utc(start_time, utc_offset)
+                d, hour, minute = delta(time, start_time)
+                day_less = d < min_day or min_day == -1
+                same_day = d <= min_day
+                hour_less = same_day and hour < min_hour
+                min_less = same_day and hour <= min_hour or minute < min_min
+                if day_less or hour_less or min_less:
+                    next_time = e_time
+                    min_day = d
+                    min_hour = hour
+                    min_min = minute
+            results.append(next_time)
+    return results
+
+
 def parse_args(*args):
     keys = []
     time = -1
     day = -1
+    find_next = False
 
     def check(q):
         if not q:
@@ -279,6 +317,9 @@ def parse_args(*args):
     was_time = False
     for arg in args:
         arg = arg.lower()
+        if arg == "next":
+            find_next = True
+            continue
         find_day = is_day(arg)
         find_time = is_time(arg)
         if was_time:
@@ -303,16 +344,16 @@ def parse_args(*args):
         keys.append(find_key)
     if len(keys) == 0:
         keys = None
-    return keys, time, day
+    return keys, time, day, find_next
 
 
 def load_aliases():
     global aliases
-    aliases = {}
+    aliases = []
     config = ConfigParser()
     config.read(join(folder, events_folder, aliases_file))
     for eid in config["Aliases"]:
-        aliases[eid.upper()] = config["Aliases"][eid].split(";")
+        aliases.append([eid.upper(), config["Aliases"][eid].split(";")])
 
 
 def load_events():
@@ -341,17 +382,175 @@ def load_events():
             event.times.append(
                 EventTime(code, int(times[0]), int(times[1]), utc))
             count += 1
-        event.times.sort(key=lambda a: a.start)
+        # event.times.sort(key=lambda a: a.start)
         events[eid] = event
+
+
+def load_reminders():
+    global reminders
+    reminder_dir = join(folder, remind_folder)
+    if not isdir(reminder_dir):
+        mkdir(reminder_dir)
+    for item in listdir(reminder_dir):
+        data = join(reminder_dir, item)
+        if isfile(data) and item.endswith(reminder_type):
+            uid = item[:-len(reminder_type)]
+            user_reminders = {}
+            data = open(data)
+            for line in data:
+                line = line.strip("\r\n ")
+                if not line or line.startswith("#"):
+                    continue
+                listing = line.split(": ")
+                stamp = int(listing[0])
+                events = listing[1].split(", ")
+                remind_time = user_reminders.get(stamp)
+                if remind_time is None:
+                    remind_time = {}
+                    user_reminders[stamp] = remind_time
+                for code in events:
+                    event = get_event(code)
+                    if event is not None and event.start == stamp:
+                        remind_time[code] = True
+            reminders[uid] = user_reminders
+
+
+def save_reminders(uid, debug_name=None):
+    if reminders.get(uid) is None:
+        return
+    file_name = join(folder, remind_folder, uid + reminder_type)
+    user_file = open(file_name, "w")
+    if debug_name is not None:
+        user_file.write("# Name: {}".format(debug_name))
+    for time in reminders[uid]:
+        e_time = reminders[uid][time]
+        if e_time is not None:
+            event_string = []
+            for code in e_time:
+                if e_time[code] is not None and e_time[code]:
+                    event_string.append(code)
+            event_string = ", ".join(event_string)
+            if event_string:
+                user_file.write("{}: {}\n".format(time, event_string))
+    user_file.flush()
+    user_file.close()
+
+
+times_list_threshold = 10
 
 
 class Unison:
     def __init__(self, nyx):
         self.nyx = nyx
 
-    @commands.group(aliases=["event"])
+    @commands.group()
     async def events(self, ctx):
-        if ctx.invoked_subcommand is not None:
+        pass
+
+    @events.command()
+    async def list(self, ctx, *args):
+        """Lists current event quests or events at a specified time.
+        Use no arguments to get current events.
+        Include the word "next" in your search to find the next occurring event
+        after now or a specified time.
+
+        e.g. "aug monday" will list all Augment Quests for Monday.
+           - "aug noon" will list all Augment Quests that happen at noon.
+           - "next aug monday noon" will find the Augment Quest that starts
+                                    after Monday at 12:00.
+        """
+        d_time, u_time = get_times()
+        hour = d_time.hour
+        minute = d_time.minute
+        day = d_time.weekday() + 1
+        stamp = day * 10000 + hour * 100 + minute
+        utc_offset = (u_time - d_time).seconds // 3600
+        keys, time, day, find_next = parse_args(*args)
+        if find_next:
+            if len(args) < 2:
+                await reply(ctx, "You didn't tell me what events to find...")
+                return
+            elif keys is None:
+                await reply(ctx,
+                            "I couldn't find any events with that name...")
+                return
+        current = (keys is None or find_next) and (
+            time == -1 and day == -1 or time == stamp)
+        if current:
+            time = stamp
+        events = find_next_events(keys, time, day,
+                                  utc_offset) if find_next else find_events(
+            keys, time, day, utc_offset)
+        if len(events) == 0:
+            await reply(ctx,
+                        "I couldn't find any events matching your query...")
+        elif find_next:
+            results = ["**Upcoming Events"]
+            if not current:
+                results.append(" After")
+                if day != -1:
+                    results.append(" " + days_full[day - 1])
+                    if time != -1:
+                        results.append(" at")
+                if time != -1:
+                    results.append(" " + time_string(time))
+            results.append(":**")
+            events.sort(key=lambda a: a.code)
+            for event in events:
+                eid = event.code
+                results.extend(
+                    ["\n - ", get_full_name(eid[:2]), " (" + eid + "): "])
+                start_time = sub_utc(event.start,
+                                     utc_offset) if event.utc else event.start
+                if start_time >= 10000 and start_time // 10000 != day:
+                    results.extend([time_string(start_time, True), " - "])
+                results.extend(["in ", delta_string(time, start_time), "."])
+            results = "".join(results)
+            await reply(ctx, results)
+        else:
+            results = ["**Current Events:**"]
+            if not current:
+                results = ["**Events",
+                           " on " + days_full[day - 1] if day != -1 else "",
+                           " at " + time_string(time) if time != -1 else "",
+                           ":**"]
+            events.sort(key=lambda a: a.code)
+            for event in events:
+                eid = event.code
+                results.extend(
+                    ["\n - ", get_full_name(eid[:2]), " (" + eid + "): "])
+                end_time = sub_utc(event.end,
+                                   utc_offset) if event.utc else event.end
+                if current:
+                    results.append(delta_string(stamp, end_time))
+                    results.append(" remaining.")
+                else:
+                    start_time = event.start
+                    if event.utc:
+                        start_time = sub_utc(event.start, utc_offset)
+                    results.append(" ".join(
+                        [time_string(start_time, True), "to",
+                         time_string(end_time)]))
+            if current:
+                results.append(
+                    "\n**For Guild Battles, use ``{} {} remind``".format(
+                        ctx.prefix, ctx.invoked_with))
+                results.append("for more help!**")
+            results = "".join(results)
+            await reply(ctx, results)
+
+    @events.command(name="next")
+    async def events_next(self, ctx, *args):
+        """Finds the next iterations of specified events.
+        It's a good idea to see what events are currently happening though.
+
+        You can also enter a time to find events after a certain time.
+        e.g. "aug" will list the next Augment Quest that happens from now.
+           - "aug tuesday 2:00 p.m." will list the next Augment Quest that
+                                     happens after Tuesday 14:00.
+        """
+        if len(args) == 0:
+            await reply(ctx, "You didn't tell me what events to find...")
             return
         d_time, u_time = get_times()
         hour = d_time.hour
@@ -359,82 +558,140 @@ class Unison:
         day = d_time.weekday() + 1
         stamp = day * 10000 + hour * 100 + minute
         utc_offset = (u_time - d_time).seconds // 3600
-        events = find_events(None, stamp, day, utc_offset)
-        if len(events) > 0:
-            results = ["**Current Events:**"]
-            for event in events:
-                eid = event.code
-                results.append(" ".join(
-                    ["\n -", get_full_name(eid[:2]), "(" + eid + "): "]))
-                end_time = sub_utc(event.end,
-                                   utc_offset) if event.utc else event.end
-                results.append(delta_string(stamp, end_time))
-                results.append(" remaining.")
-            results = "".join(results)
-            await respond(ctx, results)
-        else:
-            await ctx.send("I died. Sorry.")
-
-    @events.command()
-    async def list(self, ctx, *args):
-        d_time, u_time = get_times()
-        hour = d_time.hour
-        minute = d_time.minute
-        day = d_time.weekday() + 1
-        stamp = day * 10000 + hour * 100 + minute
-        utc_offset = (u_time - d_time).seconds // 3600
-        keys, time, day = parse_args(*args)
-        print(keys)
-        print(time)
-        print(day)
-        current = keys is None and (time == -1 and day == -1 or time == stamp)
+        keys, time, day, find_next = parse_args(*args)
+        if keys is None:
+            await reply(ctx, "I couldn't find any events with that name...")
+            return
+        current = time == -1 and day == -1 or time == stamp
         if current:
             time = stamp
-        events = find_events(keys, time, day, utc_offset)
+        events = find_next_events(keys, time, day, utc_offset)
         if len(events) > 0:
-            results = ["**Current Events:**"]
+            results = ["**Upcoming Events"]
             if not current:
-                results = ["**Events",
-                           " on " + days_full[day - 1] if day != -1 else "",
-                           " at " + time_string(time) if time != -1 else "",
-                           ":**"]
+                results.append(" After")
+                if day != -1:
+                    results.append(" " + days_full[day - 1])
+                    if time != -1:
+                        results.append(" at")
+                if time != -1:
+                    results.append(" " + time_string(time))
+            results.append(":**")
+            events.sort(key=lambda a: a.code)
             for event in events:
                 eid = event.code
-                results.append(" ".join(
-                    ["\n -", get_full_name(eid[:2]), "(" + eid + "): "]))
-                end_time = sub_utc(event.end,
-                                   utc_offset) if event.utc else event.end
-                if current:
-                    results.append(delta_string(stamp, end_time))
-                    results.append(" remaining.")
-                else:
-                    start_time = sub_utc(event.start,
-                                         utc_offset) if event.utc else event.start
-                    results.append(" ".join(
-                        [time_string(start_time, True), "to",
-                         time_string(end_time)]))
-            if current:
-                results.append(
-                    "\n**For Guild Battles, use ``{}remind``".format(
-                        ctx.prefix))
-                results.append("for more help!**")
+                results.extend(
+                    ["\n - ", get_full_name(eid[:2]), " (" + eid + "): "])
+                start_time = sub_utc(event.start,
+                                     utc_offset) if event.utc else event.start
+                if start_time >= 10000 and start_time // 10000 != day:
+                    results.extend([time_string(start_time, True), " - "])
+                results.extend(["in ", delta_string(time, start_time), "."])
             results = "".join(results)
-            await respond(ctx, results)
-        else:
-            await respond(ctx,
-                          "I couldn't find any events matching your query...")
-
-    @events.command()
-    async def next(self, ctx, *args):
-        print("Next")
+            await reply(ctx, results)
 
     @events.command()
     async def remind(self, ctx, *args):
-        print("Remind")
+        if len(args) == 0:
+            await reply(ctx, "You didn't tell me what events to find...")
+            return
+        d_time, u_time = get_times()
+        utc_offset = (u_time - d_time).seconds // 3600
+        keys, time, day, find_next = parse_args(*args)
+        if keys is None:
+            await reply(ctx, "I couldn't find any events with that name...")
+            return
+        events = find_events(keys, time, day, utc_offset)
+        if len(events) > 0:
+            global reminders
+            listing = {}
+            uid = str(ctx.author.id)
+            reminder_set = reminders.get(uid)
+            if reminder_set is None:
+                reminder_set = {}
+                reminders[uid] = reminder_set
+            for event in events:
+                stamp = event.start
+                reminder_time = reminder_set.get(stamp)
+                if reminder_time is None:
+                    reminder_time = {event.code: True}
+                    reminder_set[stamp] = reminder_time
+                else:
+                    reminder = reminder_time.get(event.code)
+                    if reminder is None or not reminder:
+                        reminder_time[event.code] = True
+                    else:
+                        continue
+                if listing.get(event.code[:2]) is None:
+                    listing[event.code[:2]] = [event]
+                else:
+                    listing[event.code[:2]].append(event)
+            if len(listing) == 0:
+                await reply(ctx,
+                            "I already have reminders set for those events...")
+                return
+            save_reminders(uid)
+            results = ["I've added reminders for the following events:"]
+            for eid in listing:
+                times_list = listing[eid]
+                results.extend(["\n - ", get_full_name(eid), ": "])
+                if len(times_list) > times_list_threshold:
+                    results.extend([str(len(times_list)), " times..."])
+                else:
+                    def key(a):
+                        return time_string(
+                            sub_utc(a.start, utc_offset) if a.utc else a.start,
+                            True)
+
+                    results.append(list_string(times_list, key=key))
+            results.extend(["\nI will DM you reminders for these events 5 ",
+                            "minutes before they start. :>"])
+            results = "".join(results)
+            await reply(ctx, results)
+        else:
+            await reply(ctx,
+                        "I couldn't find any events matching your query...")
+
+    @events.command()
+    async def unremind(self, ctx, *args):
+        global reminders
+        if len(args) == 0:
+            await reply(ctx,
+                        "You didn't tell me what event reminders to remove...")
+            return
+        elif len(args) == 1 and args[0].lower() == "all" or args[
+            0].lower() == "everything":
+            # Clear all reminders...
+            if reminders.get(ctx.author.id) is not None:
+                reminders[ctx.author.id] = {}
+                save_reminders(ctx.author.id)
+            await reply(ctx, "I've removed all reminders you may have had.")
+            return
+        d_time, u_time = get_times()
+        utc_offset = (u_time - d_time).seconds // 3600
+        keys, time, day, _ = parse_args(*args)
+        if keys is None:
+            await reply(ctx,
+                        "I couldn't find any events with that name...")
+            return
+        events = find_events(keys, time, day, utc_offset)
+
+    async def clock(self):
+        await self.nyx.wait_until_ready()
+        last_minute = -1
+        while True:
+            await sleep(1)
+            d_time = datetime.now()
+            if d_time.minute != last_minute:
+                last_minute = d_time.minute
+                u_time = datetime.utcnow()
+                utc_offset = (u_time - d_time).seconds // 3600
 
 
 def setup(nyx):
     load_aliases()
     load_events()
+    load_reminders()
     unison = Unison(nyx)
     nyx.add_cog(unison)
+    nyx.loop.create_task(unison.clock())
