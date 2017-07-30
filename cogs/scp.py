@@ -146,6 +146,7 @@ def save_titles():
         if not isdir(folder):
             mkdir(folder)
         data = open(join(folder, titles_file), "w")
+        print("The following SCPs may need manual title entries:")
         for num in titles:
             if titles[num] is not None:
                 data.write("".join([str(num), "=", titles[num], "\n"]))
@@ -293,17 +294,31 @@ async def parse_scp(ctx, number: str, post_image=False):
     await message.delete()
 
 
-class SCP:
+class SCPFoundation:
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="ohno", aliases=["3078", "SCP3078", "SCP-3078"])
+    @commands.command()
+    @commands.cooldown(1, 5, BucketType.user)
+    async def scp(self, ctx, number: int):
+        """Retrieves information on a particular SCP."""
+        if number <= 0:
+            return
+        elif number < 10:
+            number = "00" + str(number)
+        elif number < 100:
+            number = "0" + str(number)
+        else:
+            number = str(number)
+        await parse_scp(ctx, number, post_image=True)
+
+    @commands.command()
     @commands.bot_has_permissions(send_messages=True, attach_files=True)
     @commands.cooldown(1, 5, BucketType.user)
-    async def oh_no(self, ctx, *words):
+    async def ohno(self, ctx, *words):
         """Generates your very own SCP-3078 cognitohazardous shitpost.
 
-        when you inhale the devil's mary jane smoke
+        e.g. "when you inhale the devil's mary jane smoke"
         """
         # Damn I tried to imitate the SCP-3078 instances but they don't follow
         # the same layout in different imitations, so the first one is followed
@@ -336,21 +351,7 @@ class SCP:
         await ctx.send(file=File(image_bytes, filename="SCP-3078.png"))
         image_bytes.close()
 
-    @commands.command()
-    @commands.cooldown(1, 5, BucketType.user)
-    async def scp(self, ctx, number: int):
-        """Retrieves information on a particular SCP."""
-        if number <= 0:
-            return
-        elif number < 10:
-            number = "00" + str(number)
-        elif number < 100:
-            number = "0" + str(number)
-        else:
-            number = str(number)
-        await parse_scp(ctx, number, post_image=True)
-
 
 def setup(bot):
     bot.loop.run_until_complete(load_titles(bot.loop))
-    bot.add_cog(SCP(bot))
+    bot.add_cog(SCPFoundation(bot))
