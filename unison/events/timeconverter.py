@@ -3,7 +3,7 @@
 from re import match
 
 
-data = open("EventsNDST.dat")
+data = open("EventsDST.dat")
 
 output = open("EventsUTC.dat", "w")
 
@@ -20,8 +20,9 @@ for line in data:
 		output.write(line)
 	else:
 		things = line.split("-")
-		num1 = day(int(things[0]) + 500)
-		num2 = day(int(things[1]) + 500)
+		# 400 for EDT, 500 for EST (non DST)
+		num1 = day(int(things[0]) + 400)
+		num2 = day(int(things[1]) + 400)
 		if num1 >= 80000:
 			num1 -= 70000
 			num2 -= 70000

@@ -1,3 +1,12 @@
+# List of keyword to code conversions...
+# E - Eggs
+# G - Gold
+# K - Keymin
+# L - Augments
+# M - Special Events
+# P - Kesapasa
+# S - Super
+
 [Augment Quests]
 daily = false
 disabled = false
@@ -69,3 +78,9 @@ file = BC.dat
 id = BC
 utc = false
 
+[Battle Colosseum]
+daily = true
+disabled = false
+file = MC.dat
+id = MC
+utc = true

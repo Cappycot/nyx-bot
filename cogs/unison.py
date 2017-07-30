@@ -11,6 +11,7 @@ from os import listdir, mkdir
 from os.path import isdir, isfile, join
 
 from discord.ext import commands
+from discord.ext.commands import BucketType
 
 from nyxutils import list_string, reply
 
@@ -23,6 +24,7 @@ reminder_type = ".rem"
 aliases = {}
 events = {}
 # Dictionary of {uid:{time:{code:boolean}}}
+# Times are integer stamps.
 # Code-boolean pairings indicate if (True) continuous reminder or if
 # it's (False) a one-time reminder.
 reminders = {}
@@ -291,7 +293,7 @@ def find_next_events(keys, time, day, utc_offset):
                 day_less = d < min_day or min_day == -1
                 same_day = d <= min_day
                 hour_less = same_day and hour < min_hour
-                min_less = same_day and hour <= min_hour or minute < min_min
+                min_less = same_day and hour <= min_hour and minute < min_min
                 if day_less or hour_less or min_less:
                     next_time = e_time
                     min_day = d
@@ -412,7 +414,8 @@ def load_reminders():
                     event = get_event(code)
                     if event is not None and event.start == stamp:
                         remind_time[code] = True
-            reminders[uid] = user_reminders
+            if len(user_reminders) > 0:
+                reminders[uid] = user_reminders
 
 
 def save_reminders(uid, debug_name=None):
@@ -445,7 +448,15 @@ class Unison:
 
     @commands.group()
     async def events(self, ctx):
-        pass
+        if ctx.invoked_subcommand is not None:
+            return
+        prefix = ctx.prefix.replace(ctx.bot.user.mention,
+                                    "@" + ctx.bot.user.name)
+        results = "".join(["This command is still under construction...\n",
+                   "To search events, use ``{}events list``.\n".format(prefix),
+                   "For other commands like ``remind``, use ",
+                   "``{}help events`` for more info.".format(prefix)])
+        await reply(ctx, results)
 
     @events.command()
     async def list(self, ctx, *args):
@@ -533,8 +544,9 @@ class Unison:
                          time_string(end_time)]))
             if current:
                 results.append(
-                    "\n**For Guild Battles, use ``{} {} remind``".format(
-                        ctx.prefix, ctx.invoked_with))
+                    "\n**For Guild Battles, use ``{}events remind``".format(
+                        ctx.prefix.replace(ctx.bot.user.mention,
+                                           "@" + ctx.bot.user.name)))
                 results.append("for more help!**")
             results = "".join(results)
             await reply(ctx, results)
@@ -591,6 +603,7 @@ class Unison:
             await reply(ctx, results)
 
     @events.command()
+    @commands.cooldown(1, 5, BucketType.user)
     async def remind(self, ctx, *args):
         if len(args) == 0:
             await reply(ctx, "You didn't tell me what events to find...")
@@ -601,7 +614,10 @@ class Unison:
         if keys is None:
             await reply(ctx, "I couldn't find any events with that name...")
             return
-        events = find_events(keys, time, day, utc_offset)
+        if find_next:
+            events = find_next_events(keys, time, day, utc_offset)
+        else:
+            events = find_events(keys, time, day, utc_offset)
         if len(events) > 0:
             global reminders
             listing = {}
@@ -614,12 +630,12 @@ class Unison:
                 stamp = event.start
                 reminder_time = reminder_set.get(stamp)
                 if reminder_time is None:
-                    reminder_time = {event.code: True}
+                    reminder_time = {event.code: not find_next}
                     reminder_set[stamp] = reminder_time
                 else:
                     reminder = reminder_time.get(event.code)
                     if reminder is None or not reminder:
-                        reminder_time[event.code] = True
+                        reminder_time[event.code] = not find_next
                     else:
                         continue
                 if listing.get(event.code[:2]) is None:
@@ -653,18 +669,24 @@ class Unison:
                         "I couldn't find any events matching your query...")
 
     @events.command()
+    @commands.cooldown(1, 5, BucketType.user)
     async def unremind(self, ctx, *args):
         global reminders
+        uid = str(ctx.author.id)
+        reminder_set = reminders.get(uid)
         if len(args) == 0:
             await reply(ctx,
                         "You didn't tell me what event reminders to remove...")
             return
-        elif len(args) == 1 and args[0].lower() == "all" or args[
-            0].lower() == "everything":
+        elif reminder_set is None:
+            await reply(ctx, "You don't have any reminders...")
+            return
+        elif len(args) == 1 and any(
+                        args[0].lower() == a for a in ["all", "everything"]):
             # Clear all reminders...
-            if reminders.get(ctx.author.id) is not None:
-                reminders[ctx.author.id] = {}
-                save_reminders(ctx.author.id)
+            reminders[uid] = {}
+            save_reminders(uid)
+            reminders.pop(uid)
             await reply(ctx, "I've removed all reminders you may have had.")
             return
         d_time, u_time = get_times()
@@ -675,6 +697,42 @@ class Unison:
                         "I couldn't find any events with that name...")
             return
         events = find_events(keys, time, day, utc_offset)
+        if len(events) == 0:
+            await reply(ctx,
+                        "I couldn't find any events matching your query...")
+            return
+        listing = {}
+        for event in events:
+            stamp = event.start
+            codes = reminder_set.get(stamp)
+            if codes is not None and codes.pop(event.code, None) is not None:
+                if listing.get(event.code[:2]) is None:
+                    listing[event.code[:2]] = [event]
+                else:
+                    listing[event.code[:2]].append(event)
+                if len(codes) == 0:
+                    reminder_set.pop(stamp)
+        if len(listing) == 0:
+            await reply(ctx, "I couldn't find any reminders to remove...")
+        else:
+            save_reminders(uid)
+            if len(reminder_set) == 0:
+                reminders.pop(uid)
+            results = ["I've removed reminders for the following events:"]
+            for eid in listing:
+                times_list = listing[eid]
+                results.extend(["\n - ", get_full_name(eid), ": "])
+                if len(times_list) > times_list_threshold:
+                    results.extend([str(len(times_list)), " times..."])
+                else:
+                    def key(a):
+                        return time_string(
+                            sub_utc(a.start, utc_offset) if a.utc else a.start,
+                            True)
+
+                    results.append(list_string(times_list, key=key))
+            results = "".join(results)
+            await reply(ctx, results)
 
     async def clock(self):
         await self.nyx.wait_until_ready()
