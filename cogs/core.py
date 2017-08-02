@@ -1,10 +1,16 @@
 import asyncio
 
+from discord import Game, Status
 from discord.ext import commands
 from discord.ext.commands.view import StringView
 
 import nyxcommands
 from nyxutils import respond
+
+green = ["g", "green", "online"]
+yellow = ["idle", "y", "yellow"]
+red = ["busy", "r", "red"]
+gray = ["gray", "grey", "off", "offline"]
 
 
 class Core:
@@ -69,6 +75,29 @@ class Core:
         await ctx.send("Light cannot be without dark!!!")
         await asyncio.sleep(1)
         await self.nyx.logout()
+
+    @commands.command()
+    @nyxcommands.has_privilege(privilege=-1)
+    async def status(self, ctx, color, *words):
+        if any(color == a for a in green):
+            color = Status.online
+        elif any(color == a for a in yellow):
+            color = Status.idle
+        elif any(color == a for a in red):
+            color = Status.dnd
+        elif any(color == a for a in gray):
+            color = Status.offline
+        else:
+            color = None
+        if len(words) > 0:
+            words = " ".join(words)
+            activity = Game(name=words)
+            words = '"{}"'.format(words)
+        else:
+            activity = None
+            words = "nothing"
+        await self.nyx.change_presence(game=activity, status=color)
+        await respond(ctx, 'I changed my status to {}...'.format(words))
 
 
 def setup(bot):

@@ -23,7 +23,7 @@ remind_folder = "reminders"
 reminder_type = ".rem"
 aliases = {}
 events = {}
-# Dictionary of {uid:{time:{code:boolean}}}
+# Dictionary of {uid:{time:{code:ReminderTime}}}
 # Times are integer stamps.
 # Code-boolean pairings indicate if (True) continuous reminder or if
 # it's (False) a one-time reminder.
@@ -48,6 +48,25 @@ class EventTime:
         self.start = start
         self.end = end
         self.utc = utc
+
+
+class ReminderTime:
+    def __init__(self, event, repeat):
+        self.event = event
+        self.repeat = repeat
+
+
+def add_times(time1, minutes):
+    day1 = time1 // 10000
+    hour1 = (time1 % 10000) // 100
+    min1 = time1 % 100 + minutes
+    hour1 += min1 // 60
+    min1 %= 60
+    day1 += hour1 // 24
+    hour1 %= 24
+    while day1 > 7:
+        day1 -= 7
+    return day1 * 10000 + hour1 * 100 + min1
 
 
 def add_utc(time, offset):
@@ -147,7 +166,7 @@ def datetime_match(event: EventTime, time, day, utc_offset):
     return day_fit and time_fit
 
 
-def get_event(code):
+def get_event(code, force_enable=False):
     """Gets a specific EventTime from an event from a 4-digit code."""
     if len(code) != 4:
         return None
@@ -155,9 +174,12 @@ def get_event(code):
     key = code[:2]
     try:
         itr = int(code[2:]) - 1
-        for eid in events:
-            if eid == key and not events[eid].disabled:
-                return events[eid].times[itr]
+        event = events.get(key)
+        if event is not None and (not event.disabled or force_enable):
+            return event.times[itr]
+            # for eid in events:
+            #     if eid == key and not events[eid].disabled:
+            #         return events[eid].times[itr]
     except ValueError:
         return None
 
@@ -209,8 +231,16 @@ def is_day(string):
     return -1
 
 
-def is_event_code(string):
-    return any(string == a.lower() and not events[a].disabled for a in events)
+def is_event_code(string, force_enable=False):
+    enabled = not events[a].disabled or force_enable
+    return any(string == a.lower() and enabled for a in events)
+
+
+def time_stamp(datetime):
+    day = datetime.weekday() + 1
+    hour = datetime.hour
+    minute = datetime.minute
+    return day * 10000 + hour * 100 + minute
 
 
 def is_time(string):
@@ -222,11 +252,7 @@ def is_time(string):
             return hour * 100 + minute
     except (IndexError, ValueError):
         if "now" in string:
-            d_time = datetime.now()
-            day = d_time.weekday() + 1
-            hour = d_time.hour
-            minute = d_time.minute
-            return day * 10000 + hour * 100 + minute
+            return time_stamp(datetime.now())
         elif "noon" in string:
             return 1200
         elif "midnight" in string:
@@ -251,7 +277,7 @@ def time_string(number, show_day=False):
     return result + pad(int(number / 100)) + ":" + pad(number % 100)
 
 
-def find_events(keys, time, day, utc_offset):
+def find_events(keys, time, day, utc_offset, force_enable=False):
     results = []
     if time >= 10000:
         day = time // 10000
@@ -264,7 +290,8 @@ def find_events(keys, time, day, utc_offset):
                     event, time, day, utc_offset):
                 results.append(event)
     for eid in events:
-        if not events[eid].disabled and letter_match(keys, eid):
+        if (not events[eid].disabled or force_enable) and letter_match(keys,
+                                                                       eid):
             for e_time in events[eid].times:
                 if datetime_match(e_time, time, day,
                                   utc_offset) and e_time not in results:
@@ -272,7 +299,7 @@ def find_events(keys, time, day, utc_offset):
     return results
 
 
-def find_next_events(keys, time, day, utc_offset):
+def find_next_events(keys, time, day, utc_offset, force_enable=False):
     results = []
     if time < 10000 and day != -1:
         if time != -1:
@@ -280,7 +307,8 @@ def find_next_events(keys, time, day, utc_offset):
         else:
             time = day * 10000
     for eid in events:
-        if not events[eid].disabled and letter_match(keys, eid):
+        if (not events[eid].disabled or force_enable) and letter_match(keys,
+                                                                       eid):
             next_time = None
             min_day = -1
             min_hour = -1
@@ -303,7 +331,7 @@ def find_next_events(keys, time, day, utc_offset):
     return results
 
 
-def parse_args(*args):
+def parse_args(*args, force_enable=False):
     keys = []
     time = -1
     day = -1
@@ -312,8 +340,9 @@ def parse_args(*args):
     def check(q):
         if not q:
             return None
-        return get_key(q) or (q.upper().replace(",", "") if get_event(
-            q) is not None or is_event_code(q) else None)
+        exists = get_event(q, force_enable) is not None
+        exists = exists or is_event_code(q, force_enable)
+        return get_key(q) or (q.upper().replace(",", "") if exists else None)
 
     query = ""
     was_time = False
@@ -347,6 +376,29 @@ def parse_args(*args):
     if len(keys) == 0:
         keys = None
     return keys, time, day, find_next
+
+
+def fetch_reminders(uid, stamp, utc):
+    times = reminders.get(uid)
+    if times is None:
+        return []
+    codes = times.get(stamp)
+    if codes is None:
+        return []
+    listing = []
+    remove = []
+    for code in codes:
+        if get_event(code) is None:
+            continue
+        event = codes[code].event
+        if event.utc == utc:
+            if get_event(code) is not None:
+                listing.append(event)
+            if not codes[code].repeat:
+                remove.append(code)
+    for code in remove:
+        codes.pop(code)
+    return listing
 
 
 def load_aliases():
@@ -396,7 +448,10 @@ def load_reminders():
     for item in listdir(reminder_dir):
         data = join(reminder_dir, item)
         if isfile(data) and item.endswith(reminder_type):
-            uid = item[:-len(reminder_type)]
+            try:
+                uid = int(item[:-len(reminder_type)])
+            except ValueError:
+                continue
             user_reminders = {}
             data = open(data)
             for line in data:
@@ -411,9 +466,9 @@ def load_reminders():
                     remind_time = {}
                     user_reminders[stamp] = remind_time
                 for code in events:
-                    event = get_event(code)
+                    event = get_event(code, True)
                     if event is not None and event.start == stamp:
-                        remind_time[code] = True
+                        remind_time[code] = ReminderTime(event, True)
             if len(user_reminders) > 0:
                 reminders[uid] = user_reminders
 
@@ -421,7 +476,7 @@ def load_reminders():
 def save_reminders(uid, debug_name=None):
     if reminders.get(uid) is None:
         return
-    file_name = join(folder, remind_folder, uid + reminder_type)
+    file_name = join(folder, remind_folder, str(uid) + reminder_type)
     user_file = open(file_name, "w")
     if debug_name is not None:
         user_file.write("# Name: {}".format(debug_name))
@@ -430,7 +485,7 @@ def save_reminders(uid, debug_name=None):
         if e_time is not None:
             event_string = []
             for code in e_time:
-                if e_time[code] is not None and e_time[code]:
+                if e_time[code] is not None and e_time[code].repeat:
                     event_string.append(code)
             event_string = ", ".join(event_string)
             if event_string:
@@ -453,9 +508,10 @@ class Unison:
         prefix = ctx.prefix.replace(ctx.bot.user.mention,
                                     "@" + ctx.bot.user.name)
         results = "".join(["This command is still under construction...\n",
-                   "To search events, use ``{}events list``.\n".format(prefix),
-                   "For other commands like ``remind``, use ",
-                   "``{}help events`` for more info.".format(prefix)])
+                           "To search events, use ``{}events list``.\n".format(
+                               prefix),
+                           "For other commands like ``remind``, use ",
+                           "``{}help events`` for more info.".format(prefix)])
         await reply(ctx, results)
 
     @events.command()
@@ -471,10 +527,7 @@ class Unison:
                                     after Monday at 12:00.
         """
         d_time, u_time = get_times()
-        hour = d_time.hour
-        minute = d_time.minute
-        day = d_time.weekday() + 1
-        stamp = day * 10000 + hour * 100 + minute
+        stamp = time_stamp(d_time)
         utc_offset = (u_time - d_time).seconds // 3600
         keys, time, day, find_next = parse_args(*args)
         if find_next:
@@ -565,10 +618,7 @@ class Unison:
             await reply(ctx, "You didn't tell me what events to find...")
             return
         d_time, u_time = get_times()
-        hour = d_time.hour
-        minute = d_time.minute
-        day = d_time.weekday() + 1
-        stamp = day * 10000 + hour * 100 + minute
+        stamp = time_stamp(d_time)
         utc_offset = (u_time - d_time).seconds // 3600
         keys, time, day, find_next = parse_args(*args)
         if keys is None:
@@ -621,7 +671,7 @@ class Unison:
         if len(events) > 0:
             global reminders
             listing = {}
-            uid = str(ctx.author.id)
+            uid = ctx.author.id
             reminder_set = reminders.get(uid)
             if reminder_set is None:
                 reminder_set = {}
@@ -629,13 +679,16 @@ class Unison:
             for event in events:
                 stamp = event.start
                 reminder_time = reminder_set.get(stamp)
+
                 if reminder_time is None:
-                    reminder_time = {event.code: not find_next}
+                    reminder_time = {event.code: ReminderTime(event,
+                                                              not find_next)}
                     reminder_set[stamp] = reminder_time
                 else:
                     reminder = reminder_time.get(event.code)
                     if reminder is None or not reminder:
-                        reminder_time[event.code] = not find_next
+                        reminder_time[event.code] = ReminderTime(event,
+                                                                 not find_next)
                     else:
                         continue
                 if listing.get(event.code[:2]) is None:
@@ -672,7 +725,7 @@ class Unison:
     @commands.cooldown(1, 5, BucketType.user)
     async def unremind(self, ctx, *args):
         global reminders
-        uid = str(ctx.author.id)
+        uid = ctx.author.id
         reminder_set = reminders.get(uid)
         if len(args) == 0:
             await reply(ctx,
@@ -691,12 +744,12 @@ class Unison:
             return
         d_time, u_time = get_times()
         utc_offset = (u_time - d_time).seconds // 3600
-        keys, time, day, _ = parse_args(*args)
+        keys, time, day, _ = parse_args(*args, force_enable=True)
         if keys is None:
             await reply(ctx,
                         "I couldn't find any events with that name...")
             return
-        events = find_events(keys, time, day, utc_offset)
+        events = find_events(keys, time, day, utc_offset, True)
         if len(events) == 0:
             await reply(ctx,
                         "I couldn't find any events matching your query...")
@@ -743,7 +796,25 @@ class Unison:
             if d_time.minute != last_minute:
                 last_minute = d_time.minute
                 u_time = datetime.utcnow()
-                utc_offset = (u_time - d_time).seconds // 3600
+                d_stamp = add_times(time_stamp(d_time), 5)
+                u_stamp = add_times(time_stamp(u_time), 5)
+                for uid in reminders:
+                    user = self.nyx.get_user(uid)
+                    if user is None:
+                        continue
+                    listing = fetch_reminders(uid, d_stamp % 10000, False)
+                    listing.extend(fetch_reminders(uid, d_stamp, False))
+                    listing.extend(fetch_reminders(uid, u_stamp % 10000, True))
+                    listing.extend(fetch_reminders(uid, u_stamp, True))
+                    if len(listing) > 0:
+                        remind_message = ["{}, the ".format(user.name),
+                                          "following events will be up in ",
+                                          "five minutes:"]
+                        for event in listing:
+                            remind_message.extend(
+                                ["\n - ", get_full_name(event.code[:2])])
+                        remind_message = "".join(remind_message)
+                        await user.send(remind_message)
 
 
 def setup(nyx):

@@ -81,7 +81,7 @@ def locate_numbers(string):
 async def on_message(message):
     if message.author.bot:
         return
-    nums = []  # locate_numbers(message.content)
+    nums = locate_numbers(message.content)
     if len(nums) > 0:
         guild = message.guild
         oh_no = "You've uttered "

@@ -1,10 +1,9 @@
 import asyncio
+from os.path import join
 
 import discord
 import youtube_dl
-
 from discord.ext import commands
-from os.path import join
 
 # Suppress noise about console usage from errors
 youtube_dl.utils.bug_reports_message = lambda: ''
@@ -60,6 +59,7 @@ class Music:
         self.bot = bot
 
     @commands.command()
+    @commands.is_owner()
     async def join(self, ctx, *, channel: discord.VoiceChannel):
         """Joins a voice channel"""
 
@@ -68,8 +68,9 @@ class Music:
 
         await channel.connect()
 
-    @commands.command()
-    async def play(self, ctx, *, query):
+    @commands.command(name="local")
+    @commands.is_owner()
+    async def play_file(self, ctx, *, query):
         """Plays a file from the local filesystem"""
 
         if ctx.voice_client is None:
@@ -88,7 +89,8 @@ class Music:
         await ctx.send('Now playing: {}'.format(query))
 
     @commands.command()
-    async def yt(self, ctx, *, url):
+    @commands.is_owner()
+    async def play(self, ctx, *, url):
         """Streams from a url (almost anything youtube_dl supports)"""
 
         if ctx.voice_client is None:
@@ -107,6 +109,7 @@ class Music:
         await ctx.send('Now playing: {}'.format(player.title))
 
     @commands.command()
+    @commands.is_owner()
     async def volume(self, ctx, volume: float):
         """Changes the player's volume"""
 
@@ -117,6 +120,7 @@ class Music:
         await ctx.send("Changed volume to {}%".format(volume))
 
     @commands.command()
+    @commands.is_owner()
     async def stop(self, ctx):
         """Stops and disconnects the bot from voice"""
 

@@ -10,6 +10,7 @@ Notes:
 """
 
 from discord.ext import commands
+from discord.ext.commands import HelpFormatter
 import re
 
 _mentions_transforms = {
@@ -88,6 +89,10 @@ class Help:
             await destination.send(page)
 
 
-def setup(bot):
-    bot.remove_command("help")
-    bot.add_cog(Help(bot))
+class NyxHelpFormatter(HelpFormatter):
+    pass
+
+
+def setup(nyx):
+    nyx.remove_command("help")
+    nyx.add_cog(Help(nyx))
