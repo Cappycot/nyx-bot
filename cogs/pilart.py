@@ -9,7 +9,6 @@ from discord.ext.commands import BucketType
 from nyxutils import get_member, respond
 from os.path import join
 
-elements = ["fire", "water", "wind", "light", "dark", "haste"]
 templates_folder = "pillow"
 
 
@@ -163,68 +162,6 @@ class PILArt:
                     imfile.close()
                 else:
                     await respond(ctx, "Image loading failed! :<")
-
-    @commands.command(aliases=["sr"])
-    @commands.bot_has_permissions(send_messages=True, attach_files=True)
-    @commands.cooldown(1, 5, BucketType.user)
-    async def ur(self, ctx, element: str, user: str = None):
-        """Creates a UR monster of yourself or another user.
-        Credit to Bevgebra for the templates...
-        """
-        ele = None
-        element = element.lower()
-        for thing in elements:
-            if thing in element.lower():
-                ele = thing
-                break
-        if ele is None:
-            await respond(ctx, "Invalid element!")
-            ctx.command.reset_cooldown(ctx)
-            return
-        else:
-            element = ele[:1].upper() + ele[1:]
-        if user is not None:
-            user = await get_member(ctx, user)
-            if user is None:
-                await respond(ctx, "I dun know who you are talking about...")
-                ctx.command.reset_cooldown(ctx)
-                return
-        else:
-            user = ctx.message.author
-        rarity = ctx.invoked_with.upper()
-        url = user.avatar_url
-        if not url:
-            url = user.default_avatar_url
-        print(url)
-
-        async with ctx.message.channel.typing(), aiohttp.ClientSession(
-                loop=self.nyx.loop) as session, session.get(url) as req:
-            if req.status == 200:
-                imfile = BytesIO(await req.read())
-                img = Image.open(imfile)
-                snum = 5
-                ednum = snum + 426
-                base = Image.open(get_asset(rarity + "Base.png"))
-                over = Image.open(
-                    get_asset(rarity + "Overlay" + element + ".png"))
-                img = img.resize((426, 426), Image.LANCZOS)
-                mask = img if "RGBA" in img.mode else None
-                base.paste(img, (snum, snum, ednum, ednum), mask=mask)
-                base.paste(over, mask=over)
-
-                # Save in-memory filestream and send to Discord
-                imfile = BytesIO()
-                base.save(imfile, format="png")
-                # Move pointer to beginning so Discord can read pic.
-                imfile.seek(0)
-                msg = "New monster released in Unison League!"
-                if ctx.guild is not None:
-                    msg = ctx.message.author.mention + ", n" + msg[1:]
-                await ctx.send(msg,
-                               file=File(imfile, filename=rarity + ".png"))
-                imfile.close()
-            else:
-                await respond(ctx, "Image loading failed! :<")
 
 
 def setup(bot):
