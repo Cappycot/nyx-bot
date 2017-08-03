@@ -323,12 +323,12 @@ class SCPFoundation:
         # Damn I tried to imitate the SCP-3078 instances but they don't follow
         # the same layout in different imitations, so the first one is followed
         # the best here.
-        font = ImageFont.truetype("arial.ttf", 18)
+        font = ImageFont.truetype(join(folder, "Calibri.ttf"), 19)
         append = None
-        width = 260
-        x_start = 20
-        y_cur = 12
-        y_pad = 2
+        width = 256
+        x_start = 22
+        y_cur = 13
+        y_pad = 3
         image = Image.open(join(folder, "SCP-3078.png"))
         draw = ImageDraw.Draw(image)
         for word in words:
