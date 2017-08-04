@@ -59,22 +59,28 @@ def locate_numbers(string):
     indicating that the victim has accidentally turned a number into
     its factorial.
     """
-    raw_results = findall("[ ]+[0-9]*[\-]?.[0-9]*![?,.]*", " " + string)
+    raw_results = findall("[ ]+[0-9]*[\-]?.[0-9]+![?,.]*", " " + string)
+    # print(raw_results)
     results = []
     for result in raw_results:
         prefix = ""
         result = result.strip()[:-1]
+        # Locate any non-numerical section between numbers, like a divider
+        # between numerator and denominator for example.
         divider = search("[0-9][^[0-9]]*[0-9]", result)
         if divider is not None:
             prefix = result[:divider.span()[1] - 1]
             result = result[divider.span()[1] - 1:]
-        while match("[0-9]", result) is None:
+        # While unlikely with the current revision, let's try to prevent
+        # an infinite loop this time...
+        while match("[0-9]", result) is None and result:
             prefix += result[:1]
             result = result[1:]
-        while search("[0-9]$", result) is None:
+        while search("[0-9]$", result) is None and result:
             result = result[:-1]
-        if len(result) <= length_limit:
+        if len(result) <= length_limit and result:
             results.append([prefix, int(result)])
+    # print(results)
     return results
 
 
