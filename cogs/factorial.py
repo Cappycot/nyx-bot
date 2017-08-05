@@ -59,7 +59,8 @@ def locate_numbers(string):
     indicating that the victim has accidentally turned a number into
     its factorial.
     """
-    raw_results = findall("[ ]+[0-9]*[\-]?.[0-9]+![?,.]*", " " + string)
+    raw_results = findall("[ ]+[0-9]*[\-]?.?[0-9]+![?,.]*", " " + string)
+    # raw_results = findall("[ ]+[0-9]*[\-]?.[0-9]+![?,.]*", " " + string)
     # print(raw_results)
     results = []
     for result in raw_results:
