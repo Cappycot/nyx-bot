@@ -10,7 +10,7 @@ class TestSoundboard:
     def __init__(self, _):
         pass
 
-    async def play_file(self, ctx, sound):
+    async def play_file(self, ctx, sound, volume=1):
         """Plays a file from the local filesystem"""
 
         if ctx.voice_client is None:
@@ -30,6 +30,7 @@ class TestSoundboard:
 
         source = discord.PCMVolumeTransformer(
             discord.FFmpegPCMAudio(join(folder, sound)))
+        source.volume = volume
         ctx.voice_client.play(source, after=done)
 
         # await ctx.send('Now playing: {}'.format(query))
@@ -46,7 +47,11 @@ class TestSoundboard:
     async def oooooooooof(self, ctx):
         await self.play_file(ctx, "oooooooooof.mp3")
 
-    @commands.command()
+    @commands.command(aliases=["oceanman"])
+    async def ocean(self, ctx):
+        await self.play_file(ctx, "ocean.mp3", volume=0.5)
+
+    @commands.command(aliases=["cease", "ceaseyoufaggot"])
     async def fix(self, ctx):
         """Stops and disconnects the bot from voice"""
         await ctx.voice_client.disconnect()
