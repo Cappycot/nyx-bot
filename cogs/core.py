@@ -90,7 +90,10 @@ class Core:
         else:
             color = None
         if len(words) > 0:
-            words = " ".join(words)
+            mention = ctx.bot.user.mention
+            if ctx.guild is not None:
+                mention = ctx.guild.get_member(ctx.bot.user.id).mention
+            words = " ".join(words).replace(mention, "@" + ctx.bot.user.name)
             activity = Game(name=words)
             words = '"{}"'.format(words)
         else:
