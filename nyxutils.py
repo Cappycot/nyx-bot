@@ -1,5 +1,6 @@
 from discord.ext.commands import BadArgument
 from discord.ext.commands.converter import MemberConverter
+from discord.ext.commands.view import StringView
 
 
 def binary_search(array, query, key=lambda a: a, start=0, end=-1):
@@ -44,6 +45,18 @@ async def get_member(ctx, query):
         return await member_converter.convert(ctx, query)
     except BadArgument:
         return None
+
+
+def get_mention(ctx, user):
+    if ctx.guild is None:
+        return user.mention
+    return ctx.guild.get_member(user.id).mention
+
+
+def get_predicate(ctx):
+    view = StringView(ctx.message.content)
+    view.skip_string(ctx.prefix + ctx.invoked_with)
+    return view.read_rest().strip()
 
 
 # Prints a list in legible format

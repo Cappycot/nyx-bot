@@ -80,7 +80,7 @@ utc = false
 
 [Battle Colosseum]
 daily = true
-disabled = false
+disabled = true
 file = MC.dat
 id = MC
 utc = true
