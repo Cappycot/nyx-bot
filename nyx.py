@@ -9,7 +9,6 @@ https://drive.google.com/open?id=0B94jrO7TTwmORFlpeTJ1Z09UVEU
 clear; nohup python3 nyx.py >/dev/null &2>1 &
 
 Current Tasks:
- - Rewrite framework to use Discord cogs and stuff...
  - Rewrite task scheduling? (Clocks)
  - Add "dirty" boolean to Guild/UserData for write back optimization.
  - Conform to Python styling guidelines laid out in PEP 8.
@@ -292,6 +291,11 @@ class Nyx(Bot):
                     ctx.invoked_with = invoker
                     ctx.prefix += namespace_name + " "
         return ctx
+
+    async def on_message(self, message):
+        if message.author.bot:
+            return
+        await self.process_commands(message)
 
     async def invoke(self, ctx):
         if ctx.command is not None:
