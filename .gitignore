@@ -90,8 +90,12 @@ ENV/
 
 # Nyx Data
 *.nyx
-serversnew/
-usersnew/
+guilds/
+users/
+music/
+
+# Frick PyCharm
+.idea/
 
 # AWS Items
 *.pem
