@@ -6,7 +6,7 @@ https://discordapp.com/oauth2/authorize?client_id=
 
 https://drive.google.com/open?id=0B94jrO7TTwmORFlpeTJ1Z09UVEU
 
-clear; nohup python3 nyx.py >/dev/null &2>1 &
+clear; nohup python3 nyx.py >/dev/null 2>&1 &
 
 Current Tasks:
  - Rewrite task scheduling? (Clocks)
