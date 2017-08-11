@@ -17,6 +17,7 @@ from discord import File
 from discord.ext import commands
 from discord.ext.commands import BucketType
 
+from nyxcommands import has_privilege
 from nyxutils import get_member, get_predicate, list_string, reply
 
 folder = "unison"
@@ -835,6 +836,12 @@ class Unison:
     @commands.cooldown(1, 5, BucketType.user)
     async def unremind(self, ctx, *args):
         await remove_reminders(ctx, *args)
+
+    @commands.command()
+    @has_privilege(privilege=-1)
+    async def reload(self, ctx):
+        load_events()
+        await reply(ctx, "I've attempted to reload all event files.")
 
     @commands.command(aliases=["r", "sr", "ssr", "ura"])
     @commands.bot_has_permissions(send_messages=True, attach_files=True)

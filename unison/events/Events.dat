@@ -84,3 +84,10 @@ disabled = true
 file = MC.dat
 id = MC
 utc = true
+
+[Stage Wtich]
+daily = true
+disabled = false
+file = Wtich.dat
+id = MW
+utc = false
