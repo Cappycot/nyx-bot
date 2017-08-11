@@ -131,15 +131,16 @@ def check_prefix(bot, message):
     """If a guild has no specified custom prefixes, Nyx will use her mention
     appended before each of her default prefixes.
     """
+    mention = bot.user.mention
+    prefixes = []
     if message.guild is not None:
-        at_prefixes = []
         mention = message.guild.get_member(bot.user.id).mention
-        for prefix in bot.prefixes:
-            at_prefixes.append(mention + " " + prefix)
-        guild_prefixes = bot.get_guild_data(message.guild).prefixes
-        return guild_prefixes + at_prefixes
+        prefixes.extend(bot.get_guild_data(message.guild).prefixes)
     else:
-        return bot.prefixes
+        prefixes.extend(bot.prefixes)
+    for prefix in bot.prefixes:
+        prefixes.append(mention + " " + prefix)
+    return prefixes
 
 
 class Nyx(Bot):
@@ -163,8 +164,10 @@ class Nyx(Bot):
         self.namespaces = {}
         self.owner = None
         # Default command prefixes that can be overwritten...
-        self.prefixes = ["$", "~", "!", "%", "^", "&", "*", "-",
-                         "=", ",", "<", ".", ">", "/", "?"]
+        # Using '<' as a prefix is highly not recommended as '<' is the first
+        # character in a Discord mention.
+        self.prefixes = ["$", "~", "!", "%", "^", "&", "*", "-", "=", ",", ".",
+                         ">", "/", "?"]
         self.separate = False
         self.guild_data = {}
         self.guilds_folder = None
