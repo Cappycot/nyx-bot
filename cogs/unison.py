@@ -240,7 +240,7 @@ def is_day(string):
 
 def is_event_code(string, force_enable=False):
     def enabled(a):
-        return events[a].disabled or force_enable
+        return not events[a].disabled or force_enable
 
     # enabled = not events[a].disabled or force_enable
     return any(string == a.lower() and enabled(a) for a in events)
@@ -389,6 +389,7 @@ def parse_args(*args, force_enable=False):
 
 
 def fetch_reminders(uid, stamp, utc):
+    global reminders
     times = reminders.get(uid)
     if times is None:
         return []
@@ -408,6 +409,10 @@ def fetch_reminders(uid, stamp, utc):
                 remove.append(code)
     for code in remove:
         codes.pop(code)
+    if len(codes) == 0:
+        times.pop(stamp)
+        if len(times) == 0:
+            reminders.pop(uid)
     return listing
 
 
@@ -558,8 +563,8 @@ async def list_events(ctx, *args):
         elif keys is None:
             await reply(ctx, "I couldn't find any events with that name...")
             return
-    current = (keys is None or find_next) and (
-        time == -1 and day == -1 or time == stamp)
+    current = (keys is None or find_next) and time == -1 and day == -1
+    # or time == stamp) # this is a pointless check
     if current:
         time = stamp
     events = find_next_events(keys, time, day,
@@ -629,31 +634,49 @@ async def add_reminders(ctx, *args):
         await reply(ctx, "You didn't tell me what events to find...")
         return
     d_time, u_time = get_times()
+    stamp = time_stamp(d_time)
     utc_offset = (u_time - d_time).seconds // 3600
     keys, time, day, find_next = parse_args(*args)
-    if keys is None:
+    # The only time we need cooldowns is if the command results in writing out
+    # to file to prevent excessive I/O operations.
+    if find_next and len(args) < 2:
+        await reply(ctx, "You didn't tell me what events to find...")
+        ctx.command.reset_cooldown(ctx)
+        return
+    elif keys is None:
         await reply(ctx, "I couldn't find any events with that name...")
+        ctx.command.reset_cooldown(ctx)
         return
     if find_next:
+        if time == -1 and day == -1:
+            time = stamp
         events = find_next_events(keys, time, day, utc_offset)
     else:
         events = find_events(keys, time, day, utc_offset)
     if len(events) > 0:
         global reminders
         listing = {}
+        imminent = {}
         uid = ctx.author.id
         reminder_set = reminders.get(uid)
         if reminder_set is None:
             reminder_set = {}
             reminders[uid] = reminder_set
         for event in events:
-            stamp = event.start
-            reminder_time = reminder_set.get(stamp)
-
+            start_time = event.start
+            if find_next:
+                start_delta = sub_utc(start_time,
+                                      utc_offset) if event.utc else start_time
+                d, h, m = delta(stamp, start_delta)
+                delta_stamp = d * 10000 + h * 100 + m
+                if delta_stamp <= 5:
+                    imminent[event.code[:2]] = delta_string(stamp, start_delta)
+                    continue
+            reminder_time = reminder_set.get(start_time)
             if reminder_time is None:
                 reminder_time = {
                     event.code: ReminderTime(event, not find_next)}
-                reminder_set[stamp] = reminder_time
+                reminder_set[start_time] = reminder_time
             else:
                 reminder = reminder_time.get(event.code)
                 if reminder is None or not reminder:
@@ -665,30 +688,49 @@ async def add_reminders(ctx, *args):
                 listing[event.code[:2]] = [event]
             else:
                 listing[event.code[:2]].append(event)
-        if len(listing) == 0:
+        if len(listing) == 0 and len(imminent) == 0:
             await reply(ctx,
                         "I already have reminders set for those events...")
             return
-        save_reminders(uid)
-        results = ["I've added reminders for the following events:"]
-        for eid in listing:
-            times_list = listing[eid]
-            results.extend(["\n - ", get_full_name(eid), ": "])
-            if len(times_list) > times_list_threshold:
-                results.extend([str(len(times_list)), " times..."])
-            else:
-                def key(a):
-                    return time_string(
-                        sub_utc(a.start, utc_offset) if a.utc else a.start,
-                        True)
+        results = []
+        if len(imminent) > 0:
+            results.append("The following events are already imminent:")
+            for eid in imminent:
+                results.extend(
+                    ["\n - ", get_full_name(eid), "(", get_event(eid).code,
+                     "): in ", imminent[eid], "."])
+        if len(listing) > 0:
+            save_reminders(uid)
+            results.append("\nI've added reminders for the following events:")
+            for eid in listing:
+                times_list = listing[eid]
+                results.extend(["\n - ", get_full_name(eid)])
+                if find_next:
+                    event = times_list[0]
+                    start_time = event.start
+                    if event.utc:
+                        start_time = sub_utc(event.start, utc_offset)
+                    results.append(" ({}): In {}.".format(event.code,
+                                                          delta_string(
+                                                              time_stamp(
+                                                                  d_time),
+                                                              start_time)))
+                elif len(times_list) > times_list_threshold:
+                    results.extend([": ", str(len(times_list)), " times..."])
+                else:
+                    def key(a):
+                        return time_string(
+                            sub_utc(a.start, utc_offset) if a.utc else a.start,
+                            True)
 
-                results.append(list_string(times_list, key=key))
-        results.extend(["\nI will DM you reminders for these events 5 ",
-                        "minutes before they start. :>"])
+                    results.extend([": ", list_string(times_list, key=key)])
+            results.extend(["\nI will DM you reminders for these events 5 ",
+                            "minutes before they start. :>"])
         results = "".join(results)
         await reply(ctx, results)
     else:
         await reply(ctx, "I couldn't find any events matching your query...")
+        ctx.command.reset_cooldown(ctx)
 
 
 async def list_reminders(ctx, *args):
@@ -780,6 +822,7 @@ class Unison:
             return
         predicate = get_predicate(ctx)
         await list_events(ctx, *tuple(predicate.split(" ")))
+        # TODO: Figure out what to do with old code below.
         if True:
             return
         mention = ctx.bot.user.mention
@@ -797,51 +840,107 @@ class Unison:
     async def events_next(self, ctx, *args):
         """Finds the next iterations of specified events.
         It's a good idea to see what events are currently happening though.
+        You can separate event names with a comma to specify multiple events.
 
         You can also enter a time to find events after a certain time.
         e.g. "aug" will list the next Augment Quest that happens from now.
            - "aug tuesday 2:00 p.m." will list the next Augment Quest that
                                      happens after Tuesday 14:00.
+           - "reforge, aug" will list the next occurring enhancement quests.
         """
         await list_events(ctx, *("next",) + args)
 
     @events.command(name="remind")
     @commands.cooldown(1, 5, BucketType.user)
     async def events_remind(self, ctx, *args):
+        """Sets reminders for specified events.
+        Using the next keyword will change the reminder to be a one-time
+        reminder for whatever events you name.
+        You can separate event names with a comma to specify multiple events.
+
+        e.g. "super aug" will set a reminder for all Super Augment Quests.
+           - "guild battle a" will set a reminder for all Guild Battles in
+                              schedule A.
+           - "next eggs and key" will set a one-time reminder for the next
+                                 Eggs and Keymin. (WIP)
+        """
         await add_reminders(ctx, *args)
 
     @events.command(name="unremind")
     @commands.cooldown(1, 5, BucketType.user)
     async def events_unremind(self, ctx, *args):
+        """Remove reminders for events you've set reminders for.
+        Using the next keyword will permanently remove a reminder for the
+        next occurrence of the specified event. (Even if it's not one-time.)
+        You can separate event names with a comma to specify multiple events.
+
+        e.g. "super gold" will remove all Super Gold Quests reminders.
+           - "next aug" will permanently remove the next upcoming Augment
+                        Quest from your reminders.
+           - "all" will remove all reminders you have set.
+        """
         await remove_reminders(ctx, *args)
 
     @commands.command()
     async def next(self, ctx, *args):
         """Finds the next iterations of specified events.
         It's a good idea to see what events are currently happening though.
+        You can separate event names with a comma to specify multiple events.
 
         You can also enter a time to find events after a certain time.
         e.g. "aug" will list the next Augment Quest that happens from now.
            - "aug tuesday 2:00 p.m." will list the next Augment Quest that
                                      happens after Tuesday 14:00.
+           - "reforge, aug" will list the next occurring enhancement quests.
         """
         await list_events(ctx, *("next",) + args)
 
     @commands.command()
     @commands.cooldown(1, 5, BucketType.user)
     async def remind(self, ctx, *args):
+        """Sets reminders for specified events.
+        Using the next keyword will change the reminder to be a one-time
+        reminder for whatever events you name.
+        You can separate event names with a comma to specify multiple events.
+
+        e.g. "super aug" will set a reminder for all Super Augment Quests.
+           - "guild battle a" will set a reminder for all Guild Battles in
+                              schedule A.
+           - "next eggs and key" will set a one-time reminder for the next
+                                 Eggs and Keymin. (WIP)
+        """
         await add_reminders(ctx, *args)
 
     @commands.command()
     @commands.cooldown(1, 5, BucketType.user)
     async def unremind(self, ctx, *args):
+        """Remove reminders for events you've set reminders for.
+        Using the next keyword will permanently remove a reminder for the
+        next occurrence of the specified event. (Even if it's not one-time.)
+        You can separate event names with a comma to specify multiple events.
+
+        e.g. "super gold" will remove all Super Gold Quests reminders.
+           - "next aug" will permanently remove the next upcoming Augment
+                        Quest from your reminders.
+           - "all" will remove all reminders you have set.
+        """
         await remove_reminders(ctx, *args)
 
     @commands.command()
     @has_privilege(privilege=-1)
     async def reload(self, ctx):
+        """For Cappy: Reload event times..."""
         load_events()
         await reply(ctx, "I've attempted to reload all event files.")
+
+    @commands.command()
+    async def gob(self, ctx):
+        """GOB GOB"""
+        await reply(ctx, "http://bit.ly/2fQLlbB")
+
+    @commands.command(aliases=["bitch"])
+    async def grey(self, ctx):
+        await reply(ctx, "http://i.imgur.com/vvDBlmz.png")
 
     @commands.command(aliases=["r", "sr", "ssr", "ura"])
     @commands.bot_has_permissions(send_messages=True, attach_files=True)
@@ -849,6 +948,11 @@ class Unison:
     async def ur(self, ctx, *args):
         """Creates a UR monster of yourself or another user.
         Credit to Bevgebra for the templates...
+        You can optionally specify an element and/or a name.
+
+        e.g. "light" will make you a as a light element monster.
+           - "dark Nyx" will make the user 'Nyx' as a dark element monster.
+           - ""Witch Doctor"" will make the user 'Witch Doctor' as a monster.
         """
         if len(args) > 3:
             await reply(ctx, "Too many arguments you baka!")
