@@ -1,13 +1,17 @@
+"""
+This module requires PIL 4.X.X to run!
+"""
+
 from io import BytesIO
+from os.path import join
 
 import aiohttp
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from discord import File
 from discord.ext import commands
 from discord.ext.commands import BucketType
 
 from nyxutils import get_member, respond
-from os.path import join
 
 templates_folder = "pillow"
 
@@ -29,7 +33,7 @@ class PILArt:
         if user is not None:
             tofear = await get_member(ctx, user)
             if tofear is None:
-                await respond(ctx, "I dun know who you are talking about...")
+                await respond(ctx, "I don't know who you are talking about...")
                 ctx.command.reset_cooldown(ctx)
                 return
         url = tofear.avatar_url
@@ -37,12 +41,12 @@ class PILArt:
             url = tofear.default_avatar_url
 
         # Make http request for profile picture and get background
-        async with ctx.message.channel.typing(), aiohttp.ClientSession(
+        async with ctx.channel.typing(), aiohttp.ClientSession(
                 loop=self.nyx.loop) as session, session.get(url) as req:
             # async with session.get(url) as req:
             if req.status == 200:
-                imfile = BytesIO(await req.read())
-                tofear = Image.open(imfile).convert("RGBA")
+                image_bytes = BytesIO(await req.read())
+                tofear = Image.open(image_bytes).convert("RGBA")
                 backdrop = Image.open(get_asset("NoFearOneFear.png"))
 
                 # Presets for image creation
@@ -57,19 +61,67 @@ class PILArt:
                     fpos[1] + avatarside), mask=tofear)
 
                 # Save in-memory filestream and send to Discord
-                imfile = BytesIO()
-                backdrop.save(imfile, format="png")
+                image_bytes = BytesIO()
+                backdrop.save(image_bytes, format="png")
                 # Move pointer to beginning so Discord can read pic.
-                imfile.seek(0)
+                image_bytes.seek(0)
                 msg = "We are all very afraid..."
                 if ctx.guild is not None:
                     msg = ctx.message.author.mention + ", w" + msg[1:]
                 await ctx.send(msg,
-                               file=File(imfile,
+                               file=File(image_bytes,
                                          filename="Fear.png"))
-                imfile.close()
+                image_bytes.close()
             else:
                 await respond(ctx, "Image loading failed! :<")
+
+    @commands.command()
+    @commands.bot_has_permissions(send_messages=True, attach_files=True)
+    @commands.cooldown(1, 5, BucketType.user)
+    async def flirt(self, ctx, *words):
+        """Type in the pickup line of your choice here..."""
+        if not " ".join(words):
+            await respond("You didn't type in a pickup line...")
+            ctx.command.reset_cooldown(ctx)
+            return
+
+        async with ctx.channel.typing():
+            flirtfont = ImageFont.truetype(get_asset("animeace2_reg.ttf"), 16)
+            append = None
+            width = 224  # height bound is about 108
+            xstart = 18
+            ycur = 360  # ystart
+            ypad = 4
+
+            img = Image.open(get_asset("FlirtBlank.png"))
+            draw = ImageDraw.Draw(img)
+
+            for word in words:
+                if append is None:
+                    append = word
+                else:
+                    prev = append
+                    append += " " + word
+                    w, h = draw.textsize(append, font=flirtfont)
+                    if w > width:
+                        append = word
+                        draw.text((xstart, ycur), prev, fill=(0, 0, 0),
+                                  font=flirtfont)
+                        ycur += h + ypad
+            if append is not None:
+                draw.text((xstart, ycur), append, fill=(0, 0, 0),
+                          font=flirtfont)
+
+            # Save in-memory filestream and send to Discord
+            image_bytes = BytesIO()
+            img.save(image_bytes, format="png")
+            # Move pointer to beginning so Discord can read pic.
+            image_bytes.seek(0)
+            msg = "*Flirt flirt...*"
+            if ctx.guild is not None:
+                msg = ctx.message.author.mention + ", *f" + msg[2:]
+            await ctx.send(msg, file=File(image_bytes, filename="Flirt.png"))
+            image_bytes.close()
 
     @commands.command(aliases=["destroy"])
     @commands.bot_has_permissions(send_messages=True, attach_files=True)
@@ -102,15 +154,15 @@ class PILArt:
             vpos = (260, 360)
 
             # Make http request for profile pictures and get background tank
-            async with ctx.message.channel.typing(), aiohttp.ClientSession(
+            async with ctx.channel.typing(), aiohttp.ClientSession(
                     loop=self.nyx.loop) as session, session.get(
                 url1) as req1, session.get(url2) as req2:
                 # async with session.get(url1) as req1:
                 if req1.status == 200 and req2.status == 200:
-                    imfile = BytesIO(await req1.read())
-                    shooter = Image.open(imfile).convert("RGBA")
-                    imfile = BytesIO(await req2.read())
-                    victim = Image.open(imfile)
+                    image_bytes = BytesIO(await req1.read())
+                    shooter = Image.open(image_bytes).convert("RGBA")
+                    image_bytes = BytesIO(await req2.read())
+                    victim = Image.open(image_bytes)
                     # TODO: Figure out image directories
                     backdrop = Image.open(get_asset("Obliterate.png"))
 
@@ -147,19 +199,19 @@ class PILArt:
                                    mask=victim)
 
                     # Save in-memory filestream and send to Discord
-                    imfile = BytesIO()
-                    backdrop.save(imfile, format="png")
+                    image_bytes = BytesIO()
+                    backdrop.save(image_bytes, format="png")
 
                     # Move pointer to beginning.
-                    imfile.seek(0)
+                    image_bytes.seek(0)
                     msg = "Another one bites the dust! ``*CLAP*``"
                     if ctx.guild is not None:
                         msg = ctx.message.author.mention + \
                               ", a" + msg[1:]
                     await ctx.send(
-                        msg, file=File(imfile,
+                        msg, file=File(image_bytes,
                                        filename="Bwaarp.png"))
-                    imfile.close()
+                    image_bytes.close()
                 else:
                     await respond(ctx, "Image loading failed! :<")
 
