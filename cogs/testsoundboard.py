@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+from discord.ext.commands import BucketType
 
 from os.path import join
 
@@ -36,6 +37,7 @@ class TestSoundboard:
         # await ctx.send('Now playing: {}'.format(query))
 
     @commands.command(aliases=["ooof", "oooof"])
+    @commands.cooldown(1, 5, BucketType.guild)
     async def oof(self, ctx):
         await self.play_file(ctx, "oof.mp3")
 
@@ -47,11 +49,31 @@ class TestSoundboard:
     async def oooooooooof(self, ctx):
         await self.play_file(ctx, "oooooooooof.mp3")
 
-    @commands.command(aliases=["oceanman"])
-    async def ocean(self, ctx):
-        await self.play_file(ctx, "ocean.mp3", volume=0.5)
+    @commands.command(aliases=["fooo", "foooo"])
+    async def foo(self, ctx):
+        await self.play_file(ctx, "foo.mp3")
 
-    @commands.command(aliases=["cease", "ceaseyoufaggot"])
+    @commands.command(aliases=["fooooo", "fooooooo", "foooooooo"])
+    async def foooooo(self, ctx):
+        await self.play_file(ctx, "foooooo.mp3")
+
+    @commands.command(aliases=["fooooooooo", "fooooooooooo", "foooooooooooo"])
+    async def foooooooooo(self, ctx):
+        await self.play_file(ctx, "foooooooooo.mp3")
+
+    @commands.command(aliases=["pressf", "respect"])
+    async def respects(self, ctx):
+        await self.play_file(ctx, "respects.mp3")
+
+    @commands.command(aliases=["eff"])
+    async def f(self, ctx):
+        await self.play_file(ctx, "eff.mp3")
+
+    @commands.command()
+    async def tuturu(self, ctx):
+        await self.play_file(ctx, "tuturu.mp3")
+
+    @commands.command(aliases=["cease"])
     async def fix(self, ctx):
         """Stops and disconnects the bot from voice"""
         await ctx.voice_client.disconnect()
