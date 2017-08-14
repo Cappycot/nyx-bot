@@ -143,12 +143,16 @@ def delta_string(time1: int, time2: int):
     return result
 
 
+# TODO: Debug this using KP01 and LV01 with params sunday 23:50 and midnight
 def datetime_match(event: EventTime, time, day, utc_offset):
     start = event.start
     end = event.end
     if event.utc:
         start = sub_utc(start, utc_offset)
         end = sub_utc(end, utc_offset)
+    if (start > end):
+        # TODO: Debug this thing later
+        end += 70000
     # Daily events will have start integers that are less than 10000.
     if start < 10000 and day != -1:  # Test for daily events like GvG
         start += day * 10000
@@ -930,6 +934,7 @@ class Unison:
     @has_privilege(privilege=-1)
     async def reload(self, ctx):
         """For Cappy: Reload event times..."""
+        load_aliases()
         load_events()
         await reply(ctx, "I've attempted to reload all event files.")
 
@@ -982,7 +987,7 @@ class Unison:
         url = user.avatar_url or user.default_avatar_url
         # print(url)
 
-        async with ctx.message.channel.typing(), aiohttp.ClientSession(
+        async with ctx.channel.typing(), aiohttp.ClientSession(
                 loop=self.nyx.loop) as session, session.get(url) as req:
             if req.status == 200:
                 imfile = BytesIO(await req.read())
