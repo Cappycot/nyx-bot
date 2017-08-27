@@ -2,63 +2,63 @@
 
 LV: Augment Quests
 # Gosh these are all so loooong... jk now it ain't.
-1000-1130
-1600-1730
-2200-2330
-400-530
+0600-0730
+1200-1330
+1800-1930
+0000-0130
 END
 # Finally dammit!!
 
 
 
 EP: Eggs & Kesapasa
-1000-1200
-1800-2000
-200-400
+0600-0800
+1400-1600
+2200-0000
 END
 
 
 
 EK: Eggs & Keymin
-800-1000
-1600-1800
-0-200
-END
-
-
-
-GP: Glorious Kesapasa
-600-800
-1400-1600
-2200-0
-END
-
-
-
-KP: Keymin & Kesapasa
-400-600
+0400-0600
 1200-1400
 2000-2200
 END
 
 
 
-SL: Super Augment Quests
-61200-61220
-62400-70020
+GP: Glorious Kesapasa
+0200-0400
+1000-1200
+1800-2000
+END
 
-71200-71220
-72400-80020
+
+
+KP: Keymin & Kesapasa
+0000-0200
+0800-1000
+1600-1800
+END
+
+
+
+SL: Super Augment Quests
+60800-60820
+62000-62020
+
+70800-70820
+72000-72020
 END
 
 
 
 SG: Super Gold Quests
-61630-61800
-62230-62400
+61230-61400
+61830-62000
 
-71630-71800
-72230-72400
+71230-71400
+71830-72000
 END
 
 

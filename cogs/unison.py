@@ -191,7 +191,7 @@ def get_event(code, force_enable=False):
             # for eid in events:
             #     if eid == key and not events[eid].disabled:
             #         return events[eid].times[itr]
-    except ValueError:
+    except (ValueError, IndexError):
         return None
 
 

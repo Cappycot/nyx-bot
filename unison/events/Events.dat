@@ -8,28 +8,28 @@
 # S - Super
 
 [Augment Quests]
-daily = false
+daily = true
 disabled = false
 file = LV.dat
 id = LV
 utc = true
 
 [Eggs & Kesapasa]
-daily = false
+daily = true
 disabled = false
 file = EP.dat
 id = EP
 utc = true
 
 [Eggs & Keymin]
-daily = false
+daily = true
 disabled = false
 file = EK.dat
 id = EK
 utc = true
 
 [Glorious Kesapasa]
-daily = false
+daily = true
 disabled = false
 file = GP.dat
 # Fuck G stands for gold LOL
@@ -37,7 +37,7 @@ id = PP
 utc = true
 
 [Keymin & Kesapasa]
-daily = false
+daily = true
 disabled = false
 file = KP.dat
 id = KP
@@ -87,7 +87,7 @@ utc = true
 
 [Stage Wtich]
 daily = true
-disabled = false
+disabled = true
 file = Wtich.dat
 id = MW
 utc = false
