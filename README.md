@@ -14,5 +14,4 @@ Currently a WIP...
 - [x] Make repository
 - [x] Turn module system back to standard Discord cog system so I can not be stupid.
 - [ ] Rewrite README.md
-- [x] Create temp branches so I can stop pushing to master like a fool
-- [ ] Finish this list
+- [ ] Turn the entire framework into an importable library.

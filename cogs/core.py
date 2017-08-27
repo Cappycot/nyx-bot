@@ -62,11 +62,15 @@ class Core:
     @nyxcommands.has_privilege(privilege=-1)
     async def echo(self, ctx, *words):
         """I copy what you say."""
+        stuff = " ".join(words)
+        if not stuff:
+            await ctx.send("What?")
+            return
         if ctx.guild is not None and ctx.message.channel.permissions_for(
                 ctx.message.guild.get_member(
                     self.nyx.user.id)).manage_messages:
             await ctx.message.delete()
-        await ctx.send(" ".join(words))
+        await ctx.send(stuff)
 
     @commands.command()
     @nyxcommands.has_privilege(privilege=-1)
