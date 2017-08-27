@@ -242,7 +242,7 @@ class UnisonOldSpawn:
             ctx.command.reset_cooldown(ctx)
             return
         msg = await ctx.channel.send("Spawning...\n:large_blue_circle: >>>>")
-        spawn_ten = amount > 10
+        spawn_ten = amount >= 10
         spawned = []
         top_rank = 0
         for i in range(0, amount):
