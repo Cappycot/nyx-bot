@@ -230,7 +230,7 @@ class UnisonOldSpawn:
         self.nyx = nyx
 
     @commands.command(aliases=["spawnr"])
-    @commands.cooldown(1, 5, BucketType.user)
+    @commands.cooldown(1, 2, BucketType.user)
     async def spawn(self, ctx, amount: int = 1):
         """Brings forth a rush of salt...
         The amount spawned has to be between 1 and 30 inclusive.
@@ -290,8 +290,8 @@ class UnisonOldSpawn:
             for spawn in spawned:
                 msg.append("".join(["\n", spawn.name, " (", ranks[spawn.rank],
                                     ") at " + (
-                                        "%.5f" % (
-                                            spawn.prob * 100 / len(things))),
+                                        "%.2f" % (
+                                            spawn.prob * 10000 / len(things))),
                                     "% probability."]))
                 if spawn.rank == 3:
                     msg.extend(["\n", url_prefix, spawn.url])
@@ -304,7 +304,7 @@ class UnisonOldSpawn:
             spawned = spawned[0]
             msg = "".join(["Congratulations! You spawned ", spawned.name, " (",
                            ranks[spawned.rank], ") at ",
-                           ("%.5f" % (spawned.prob * 100 / len(things))),
+                           ("%.2f" % (spawned.prob * 10000 / len(things))),
                            "% probability.\n", url_prefix, spawned.url])
         await reply(ctx, msg)
 
