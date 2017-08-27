@@ -233,6 +233,7 @@ class UnisonOldSpawn:
     @commands.cooldown(1, 5, BucketType.user)
     async def spawn(self, ctx, amount: int = 1):
         """Brings forth a rush of salt...
+        The amount spawned has to be between 1 and 30 inclusive.
 
         Dedicated to our old friend RusyChicken, who had the original RNGesus
         spawning bot.
