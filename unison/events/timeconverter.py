@@ -3,7 +3,7 @@
 from re import match
 
 
-data = open("EventsNewDST.dat")
+data = open("MO.dat")
 
 output = open("EventsUTC.dat", "w")
 

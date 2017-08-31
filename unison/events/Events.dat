@@ -85,6 +85,13 @@ file = MC.dat
 id = MC
 utc = true
 
+[Mobius Path]
+daily = true
+disabled = false
+file = MO.dat
+id = MO
+utc = true
+
 [Stage Wtich]
 daily = true
 disabled = true

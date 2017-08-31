@@ -1030,6 +1030,7 @@ class Unison:
                 u_time = datetime.utcnow()
                 d_stamp = add_times(time_stamp(d_time), 5)
                 u_stamp = add_times(time_stamp(u_time), 5)
+                # print("Stamps: {} and {}".format(d_stamp, u_stamp))
                 for uid in reminders:
                     user = self.nyx.get_user(uid)
                     if user is None:
