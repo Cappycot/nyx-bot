@@ -507,21 +507,3 @@ class Nyx(Bot):
             await ctx.send(content)
         else:
             await ctx.send(ctx.message.author.mention + ", " + content)
-
-
-if __name__ == "__main__":
-    nyx = Nyx()
-
-    nyx.load_cogs("cogs")
-
-    nyx_config = ConfigParser()
-    nyx_config.read(nyx_config_file)
-    # If the file doesn't exist ConfigParser will just read empty.
-    if "Settings" not in nyx_config:
-        print("Settings not found. Configure your " +
-              nyx_config_file + " file.")
-    elif "Token" not in nyx_config["Settings"]:
-        print("Token setting not found. Configure your " +
-              nyx_config_file + " file.")
-    else:
-        nyx.run(nyx_config["Settings"]["Token"])

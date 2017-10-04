@@ -4,8 +4,8 @@ from discord import Game, Status
 from discord.ext import commands
 from discord.ext.commands.view import StringView
 
-import nyxcommands
-from nyxutils import respond
+import nyx.nyxcommands as nyxcommands
+from nyx.nyxutils import respond
 
 green = ["g", "green", "online"]
 yellow = ["idle", "y", "yellow"]

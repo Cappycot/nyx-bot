@@ -1,10 +1,11 @@
 """Default loader for user-specific data."""
 
 from configparser import ConfigParser, ParsingError
-from discord.ext import commands
-from nyx import UserData
 from os import getcwd, listdir
 from os.path import isfile, join
+
+# from discord.ext import commands
+from nyx.nyx import UserData
 
 default_folder = "users"
 
