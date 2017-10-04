@@ -13,7 +13,7 @@ from os.path import isdir, isfile, join
 
 import aiohttp
 from PIL import Image
-from discord import File
+from discord import File, Forbidden
 from discord.ext import commands
 from discord.ext.commands import BucketType
 
@@ -809,6 +809,7 @@ async def remove_reminders(ctx, *args):
 class Unison:
     def __init__(self, nyx):
         self.nyx = nyx
+        self.clock_running = False
 
     @commands.group(aliases=["event"])
     async def events(self, ctx):
@@ -939,6 +940,19 @@ class Unison:
         await reply(ctx, "I've attempted to reload all event files.")
 
     @commands.command()
+    @has_privilege(privilege=-1)
+    @commands.cooldown(1, 3, BucketType.default)
+    async def checkclock(self, ctx):
+        async with ctx.channel.typing():
+            self.clock_running = False
+            await sleep(3)
+            if self.clock_running:
+                await reply(ctx, "The event clock is still running.")
+            else:
+                self.nyx.loop.create_task(self.clock())
+                await reply(ctx, "The clock was dead, so I started it again.")
+
+    @commands.command()
     async def gob(self, ctx):
         """GOB GOB"""
         await reply(ctx, "http://bit.ly/2fQLlbB")
@@ -1024,6 +1038,8 @@ class Unison:
         last_minute = -1
         while True:
             await sleep(1)
+            if not self.clock_running:
+                self.clock_running = True
             d_time = datetime.now()
             if d_time.minute != last_minute:
                 last_minute = d_time.minute
@@ -1047,7 +1063,10 @@ class Unison:
                             remind_message.extend(
                                 ["\n - ", get_full_name(event.code[:2])])
                         remind_message = "".join(remind_message)
-                        await user.send(remind_message)
+                        try:
+                            await user.send(remind_message)
+                        except Forbidden:
+                            pass
 
 
 def setup(nyx):

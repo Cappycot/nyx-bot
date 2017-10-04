@@ -70,6 +70,7 @@ class Core:
                 ctx.message.guild.get_member(
                     self.nyx.user.id)).manage_messages:
             await ctx.message.delete()
+        print(stuff)
         await ctx.send(stuff)
 
     @commands.command()

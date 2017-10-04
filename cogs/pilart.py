@@ -44,6 +44,8 @@ class PILArt:
                     break
             if url is None:
                 await respond(ctx, "I couldn't find an image to use...")
+                ctx.command.reset_cooldown(ctx)
+                return
             async with aiohttp.ClientSession(
                     loop=self.nyx.loop) as session, session.get(url) as req:
                 if req.status == 200:

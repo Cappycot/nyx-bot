@@ -27,6 +27,7 @@ class Help:
 
     @commands.command()
     async def help(self, ctx, *commands: str):
+        """Gives help in the form of command descriptions and usages."""
         nyx = ctx.bot
         destination = ctx.message.author if nyx.pm_help \
             else ctx.message.channel

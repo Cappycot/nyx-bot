@@ -26,12 +26,12 @@ series_range = (highest_scp + 1) // 1000
 titles = {(i + 1): None for i in range(highest_scp)}
 
 
-def SCP_2521(embed: Embed):
+def scp_2521(embed: Embed):
     embed.colour = Color.red()
     return "Are you trying to get me killed?!?"
 
 
-def SCP_2602(embed: Embed):
+def scp_2602(embed: Embed):
     """Did you know this thing used to be a library?"""
     embed.set_field_at(0, name="Library Class:", value="Former")
     embed.title = "SCP-2602, which used to be a library"
@@ -44,13 +44,13 @@ def SCP_2602(embed: Embed):
 # 2930
 # 2956
 
-def SCP_2565(embed: Embed):
+def scp_2565(embed: Embed):
     embed.colour = Color.red()
     embed.description = "Allison Eckhart"
     embed.set_field_at(0, name="Allison Eckhart Class:", value="Keter")
 
 
-def SCP_61231(embed: Embed):
+def scp_61231(embed: Embed):
     """SCP-2769: It's a really shitty implementation of some infohazard and I
     don't really feel like figuring the thing out. Seriously.
     """
@@ -61,11 +61,11 @@ def SCP_61231(embed: Embed):
     embed.title = "SCP-61231"
 
 
-def SCP_2864(embed: Embed):
+def scp_2864(embed: Embed):
     embed.description = "Di Molte Voci"
 
 
-def SCCP_2930(embed: Embed):
+def sccp_2930(embed: Embed):
     """SCP-2930, except with most of the letter c c being repeated LOL"""
     object_class = embed.fields[0].value
     embed.description = "Cross City City City City Hall"
@@ -76,15 +76,15 @@ def SCCP_2930(embed: Embed):
     embed.title = "SCCP-2930"
 
 
-def SCP_2956(embed: Embed):
+def scp_2956(embed: Embed):
     embed.description = "A film by SCP-2956, products of Natura Toys."
     embed.title = "TriStar Pictures"
 
 
-hard_code_specials = {"SCP-2521": SCP_2521, "SCP-2602": SCP_2602,
-                      "SCP-2565": SCP_2565, "SCP-2769": SCP_61231,
-                      "SCP-2864": SCP_2864, "SCP-2930": SCCP_2930,
-                      "SCP-2956": SCP_2956}
+hard_code_specials = {"SCP-2521": scp_2521, "SCP-2602": scp_2602,
+                      "SCP-2565": scp_2565, "SCP-2769": scp_61231,
+                      "SCP-2864": scp_2864, "SCP-2930": sccp_2930,
+                      "SCP-2956": scp_2956}
 
 
 def read_component(thing):
@@ -202,10 +202,9 @@ async def load_titles(loop, force_fetch=False):
 async def parse_scp(ctx, number: str, post_image=False):
     url = "http://scp-wiki.wikidot.com/scp-" + number
     message = await ctx.send("Fetching SCP information...")
-    async with ctx.message.channel.typing(), ClientSession(
+    async with ctx.channel.typing(), ClientSession(
             loop=ctx.bot.loop) as session, session.get(url) as req:
         if req.status == 200:
-            # TODO: Figure out how to break up time-consuming thread...
             embed = Embed(title="SCP-" + number,
                           description=titles[int(number)],
                           url=url)
@@ -323,33 +322,37 @@ class SCPFoundation:
         # Damn I tried to imitate the SCP-3078 instances but they don't follow
         # the same layout in different imitations, so the first one is followed
         # the best here.
-        font = ImageFont.truetype(join(folder, "Calibri.ttf"), 19)
-        append = None
-        width = 256
-        x_start = 22
-        y_cur = 13
-        y_pad = 3
-        image = Image.open(join(folder, "SCP-3078.png"))
-        draw = ImageDraw.Draw(image)
-        for word in words:
-            if append is None:
-                append = word
-            else:
-                prev = append
-                append = " ".join([append, word])
-                w, h = draw.textsize(append, font=font)
-                if w > width:
+        async with ctx.channel.typing():
+            font = ImageFont.truetype(join(folder, "Calibri.ttf"), 19)
+            append = None
+            width = 256
+            x_start = 22
+            y_cur = 13
+            y_pad = 3
+
+            image = Image.open(join(folder, "SCP-3078.png"))
+            draw = ImageDraw.Draw(image)
+
+            for word in words:
+                if append is None:
                     append = word
-                    draw.text((x_start, y_cur), prev, fill=(0, 0, 0),
-                              font=font)
-                    y_cur += h + y_pad
-        if append is not None:
-            draw.text((x_start, y_cur), append, fill=(0, 0, 0), font=font)
-        image_bytes = BytesIO()
-        image.save(image_bytes, format="png")
-        image_bytes.seek(0)
-        await ctx.send(file=File(image_bytes, filename="SCP-3078.png"))
-        image_bytes.close()
+                else:
+                    prev = append
+                    append = " ".join([append, word])
+                    w, h = draw.textsize(append, font=font)
+                    if w > width:
+                        append = word
+                        draw.text((x_start, y_cur), prev, fill=(0, 0, 0),
+                                  font=font)
+                        y_cur += h + y_pad
+            if append is not None:
+                draw.text((x_start, y_cur), append, fill=(0, 0, 0), font=font)
+
+            image_bytes = BytesIO()
+            image.save(image_bytes, format="png")
+            image_bytes.seek(0)
+            await ctx.send(file=File(image_bytes, filename="SCP-3078.png"))
+            image_bytes.close()
 
 
 def setup(bot):

@@ -71,4 +71,5 @@ class FakeFlower():
 
 
 def setup(bot):
-    bot.add_cog(FakeFlower(bot))
+    pass
+    # bot.add_cog(FakeFlower(bot))

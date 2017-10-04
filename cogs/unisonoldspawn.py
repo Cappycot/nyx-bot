@@ -233,17 +233,17 @@ class UnisonOldSpawn:
     @commands.cooldown(1, 2, BucketType.user)
     async def spawn(self, ctx, amount: int = 1):
         """Brings forth a rush of salt...
-        The amount spawned has to be between 1 and 30 inclusive.
+        The amount spawned has to be between 1 and 10 inclusive.
 
         Dedicated to our old friend RusyChicken, who had the original RNGesus
         spawning bot.
         """
-        if amount < 1 or amount > 30:
+        if amount < 1 or amount > 10:
             await reply(ctx, "WTF?!")
             ctx.command.reset_cooldown(ctx)
             return
         msg = await ctx.channel.send("Spawning...\n:large_blue_circle: >>>>")
-        spawn_ten = amount >= 10
+        spawn_ten = amount == 10
         spawned = []
         top_rank = 0
         for i in range(0, amount):
