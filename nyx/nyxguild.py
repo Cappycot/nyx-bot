@@ -7,7 +7,7 @@ from os.path import isfile, join
 from discord.ext import commands
 
 import nyx.nyxcommands as nyxcommands
-from nyx.nyx import GuildData
+from nyx.nyxdata import GuildData
 from nyx.nyxutils import list_string, respond
 
 default_folder = "guilds"
@@ -132,7 +132,8 @@ class Guild:
                                            "are " if plural else "is ",
                                            result]))
 
-    @module.command(name="remove", aliases=["d", "del", "deport", "r", "rem"])
+    @module.command(name="remove",
+                    aliases=["d", "del", "deport", "r", "rem", "rm"])
     @commands.guild_only()
     @nyxcommands.has_privilege_or_permissions(privilege=-1, manage_server=True)
     async def module_remove(self, ctx, *modules):
@@ -203,7 +204,3 @@ class Guild:
             await self.nyx.reply(ctx, "Prefix" + (
                 "es" if plural else "") + " for this server " +
                                  ("are " if plural else "is ") + result)
-
-
-def setup(bot):
-    bot.add_cog(Guild(bot))

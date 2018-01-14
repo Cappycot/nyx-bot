@@ -17,8 +17,8 @@ from discord import File, Forbidden
 from discord.ext import commands
 from discord.ext.commands import BucketType
 
-from nyxcommands import has_privilege
-from nyxutils import get_member, get_predicate, list_string, reply
+from nyx.nyxcommands import has_privilege
+from nyx.nyxutils import get_member, get_predicate, list_string, reply
 
 folder = "unison"
 events_folder = "events"
@@ -1047,7 +1047,8 @@ class Unison:
                 d_stamp = add_times(time_stamp(d_time), 5)
                 u_stamp = add_times(time_stamp(u_time), 5)
                 # print("Stamps: {} and {}".format(d_stamp, u_stamp))
-                for uid in reminders:
+                final_reminders = reminders.copy()
+                for uid in final_reminders:
                     user = self.nyx.get_user(uid)
                     if user is None:
                         continue

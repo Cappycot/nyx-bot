@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime
 from discord.ext import commands
-import nyxcommands
+import nyx.nyxcommands as nyxcommands
 
 channel = None
 role = None

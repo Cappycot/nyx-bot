@@ -106,3 +106,6 @@ class Core:
             words = "nothing"
         await self.nyx.change_presence(game=activity, status=color)
         await respond(ctx, 'I changed my status to {}...'.format(words))
+
+def setup(nyx):
+    nyx.add_cog(Core(nyx))

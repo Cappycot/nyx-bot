@@ -6,7 +6,7 @@ from random import randint
 from discord.ext import commands
 from discord.ext.commands import BucketType
 
-from nyxutils import reply
+from nyx.nyxutils import reply
 
 ranks = ["WTF", "R", "SR", "SSR"]
 emoji = [":large_blue_circle:", "<:rare:230893693371023360>",
@@ -97,6 +97,7 @@ def load():
     SpawnItem("Archer", "Archer_(Gear)", 0.01, 3)
     SpawnItem("Misato Katsuragi", "_(Gear)", 0.01, 3)
     SpawnItem("~~BDSM~~ Elizabeth", "Elizabeth_(Gear)", 0.05, 3)
+    SpawnItem("Yukata Miku", "Yukata_Miku_(Gear)", 0.01, 3)
 
     # Water SSRs
     # SpawnItem("", "_(Gear)", 0.01, 3)
@@ -124,6 +125,7 @@ def load():
     SpawnItem("Moca, Noble Maid", "Moca,_Noble_Maid_(Gear)", 0.01,
               3)  # May change to 0.05
     SpawnItem("Sakura Miku x Pixie", "Sakura_Miku_x_Pixie_(Gear)", 0.01, 3)
+    SpawnItem("[Club DJ] Himiko", "-Club_DJ-_Himiko_(Gear)", 0.01, 3)
 
     # Wind SSRs
     # SpawnItem("", "_(Gear)", 0.01, 3)
@@ -150,6 +152,8 @@ def load():
     SpawnItem("Rin Tohsaka", "Rin_Tohsaka_(Gear)", 0.01, 3)
     SpawnItem("Eva RT2 (F Type C)", "Eva_RT2_(F_Type_C)_(Gear)", 0.01, 3)
     SpawnItem("Eva Unit 08", "Eva_Unit_08_(Gear)", 0.01, 3)
+    SpawnItem("Ranmaru", "Ranmaru_(Gear)", 0.01, 3)
+    SpawnItem("Feline Kagamine Rin", "Feline_Kagamine_Rin_(Gear)", 0.01, 3)
 
     # Light SSRs
     # SpawnItem("", "_(Gear)", 0.01, 3)
@@ -206,6 +210,7 @@ def load():
     SpawnItem("Mischievous Mary", "Mischievous_Mary_(Gear)", 0.1, 3)
     SpawnItem("Eva Unit 13", "Eva_Unit_13_(Gear)", 0.01, 3)
     SpawnItem("Stargod Uranus", "Stargod_Uranus_(Gear)", 0.05, 3)
+    SpawnItem("Petit Luka", "Petit_Luka_(Gear)", 0.01, 3)
 
     # Haste SSRs
     # SpawnItem("", "_(Gear)", 0.01, 3)

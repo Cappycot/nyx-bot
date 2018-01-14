@@ -88,6 +88,9 @@ ENV/
 # Rope project settings
 .ropeproject
 
+# Discord
+cogs/
+
 # Nyx Data
 *.nyx
 guilds/
@@ -95,6 +98,7 @@ users/
 music/
 
 # Frick PyCharm
+dictionaries/
 .idea/
 
 # AWS Items

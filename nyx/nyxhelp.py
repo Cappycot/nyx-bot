@@ -94,6 +94,6 @@ class NyxHelpFormatter(HelpFormatter):
     pass
 
 
-def setup(nyx):
-    nyx.remove_command("help")
-    nyx.add_cog(Help(nyx))
+# def setup(nyx):
+# nyx.remove_command("help")
+# nyx.add_cog(Help(nyx))

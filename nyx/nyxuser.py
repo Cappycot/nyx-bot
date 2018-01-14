@@ -5,7 +5,7 @@ from os import getcwd, listdir
 from os.path import isfile, join
 
 # from discord.ext import commands
-from nyx.nyx import UserData
+from nyx.nyxdata import UserData
 
 default_folder = "users"
 
@@ -82,7 +82,3 @@ class User:
             return False
         for uid in self.nyx.user_data:
             self.save_user_data(uid)
-
-
-def setup(bot):
-    bot.add_cog(User(bot))
