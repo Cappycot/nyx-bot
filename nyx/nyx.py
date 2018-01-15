@@ -9,6 +9,7 @@ https://drive.google.com/open?id=0B94jrO7TTwmORFlpeTJ1Z09UVEU
 clear; python3 nyx.py &
 
 Current Tasks:
+ - Adapt Nyx to be something we can install with pip
  - Rewrite task scheduling? (Clocks)
  - Add "dirty" boolean to Guild/UserData for write back optimization.
  - Conform to Python styling guidelines laid out in PEP 8.
@@ -16,7 +17,6 @@ Future Tasks:
  - Split Nyx up into Nyx and AutoShardedNyx and have original
    be NyxBase...
  - Move all module code on repo to the new Nyx-Modules repo.
- - Figure out GitHub API for automatic code updates?
 """
 
 import inspect

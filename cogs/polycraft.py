@@ -59,8 +59,8 @@ class ServerPingThread(Thread):
         return embed
 
 
-site = "https://www.polycraftworld.com/"
-servers = {25566: "Lithium", 25567: "Beryllium"}
+site = ""
+servers = {25565: "Server"}
 
 
 class Polycraft:
@@ -74,9 +74,7 @@ class Polycraft:
         if timeout < 1:
             timeout = 1
         async with ctx.message.channel.typing():
-            threads = [ServerPingThread("polycraft-game.cloudapp.net", key,
-                                        servers[key], site=site) for key in
-                       servers]
+            threads = []
             for thread in threads:
                 thread.start()
             await sleep(timeout)
