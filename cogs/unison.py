@@ -13,12 +13,12 @@ from os.path import isdir, isfile, join
 
 import aiohttp
 from PIL import Image
-from discord import File
+from discord import File, Forbidden
 from discord.ext import commands
 from discord.ext.commands import BucketType
 
-from nyxcommands import has_privilege
-from nyxutils import get_member, get_predicate, list_string, reply
+from nyx.nyxcommands import has_privilege
+from nyx.nyxutils import get_member, get_predicate, list_string, reply
 
 folder = "unison"
 events_folder = "events"
@@ -809,6 +809,7 @@ async def remove_reminders(ctx, *args):
 class Unison:
     def __init__(self, nyx):
         self.nyx = nyx
+        self.clock_running = False
 
     @commands.group(aliases=["event"])
     async def events(self, ctx):
@@ -939,6 +940,19 @@ class Unison:
         await reply(ctx, "I've attempted to reload all event files.")
 
     @commands.command()
+    @has_privilege(privilege=-1)
+    @commands.cooldown(1, 3, BucketType.default)
+    async def checkclock(self, ctx):
+        async with ctx.channel.typing():
+            self.clock_running = False
+            await sleep(3)
+            if self.clock_running:
+                await reply(ctx, "The event clock is still running.")
+            else:
+                self.nyx.loop.create_task(self.clock())
+                await reply(ctx, "The clock was dead, so I started it again.")
+
+    @commands.command()
     async def gob(self, ctx):
         """GOB GOB"""
         await reply(ctx, "http://bit.ly/2fQLlbB")
@@ -1024,6 +1038,8 @@ class Unison:
         last_minute = -1
         while True:
             await sleep(1)
+            if not self.clock_running:
+                self.clock_running = True
             d_time = datetime.now()
             if d_time.minute != last_minute:
                 last_minute = d_time.minute
@@ -1031,7 +1047,8 @@ class Unison:
                 d_stamp = add_times(time_stamp(d_time), 5)
                 u_stamp = add_times(time_stamp(u_time), 5)
                 # print("Stamps: {} and {}".format(d_stamp, u_stamp))
-                for uid in reminders:
+                final_reminders = reminders.copy()
+                for uid in final_reminders:
                     user = self.nyx.get_user(uid)
                     if user is None:
                         continue
@@ -1047,7 +1064,10 @@ class Unison:
                             remind_message.extend(
                                 ["\n - ", get_full_name(event.code[:2])])
                         remind_message = "".join(remind_message)
-                        await user.send(remind_message)
+                        try:
+                            await user.send(remind_message)
+                        except Forbidden:
+                            pass
 
 
 def setup(nyx):

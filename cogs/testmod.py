@@ -1,6 +1,6 @@
 from discord.ext import commands
 
-from nyxutils import respond
+from nyx.nyxutils import respond
 
 
 class TestOne:

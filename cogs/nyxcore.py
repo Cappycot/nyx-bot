@@ -4,8 +4,8 @@ from discord import Game, Status
 from discord.ext import commands
 from discord.ext.commands.view import StringView
 
-import nyxcommands
-from nyxutils import respond
+import nyx.nyxcommands as nyxcommands
+from nyx.nyxutils import respond
 
 green = ["g", "green", "online"]
 yellow = ["idle", "y", "yellow"]
@@ -70,6 +70,7 @@ class Core:
                 ctx.message.guild.get_member(
                     self.nyx.user.id)).manage_messages:
             await ctx.message.delete()
+        print(stuff)
         await ctx.send(stuff)
 
     @commands.command()
@@ -106,6 +107,5 @@ class Core:
         await self.nyx.change_presence(game=activity, status=color)
         await respond(ctx, 'I changed my status to {}...'.format(words))
 
-
-def setup(bot):
-    bot.add_cog(Core(bot))
+def setup(nyx):
+    nyx.add_cog(Core(nyx))
