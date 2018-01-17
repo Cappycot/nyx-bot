@@ -12,6 +12,7 @@ Currently a WIP...
 ### To Do:
 
 - [x] Make repository
-- [x] Turn module system back to standard Discord cog system so I can not be stupid.
+- [x] Turn module system back to standard Discord cog system so I can not be stupid
 - [ ] Rewrite README.md
-- [ ] Turn the entire framework into an importable library.
+- [ ] Turn the entire framework into an importable library
+- [ ] Move unimportant cogs to another repository
