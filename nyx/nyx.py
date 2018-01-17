@@ -99,6 +99,9 @@ class Nyx(Bot):
         self.add_cog(User(self))
 
     def add_cog(self, cog):
+        """At the moment we're overriding this to have a dict of all the cogs
+        based on their lowercase names. I am not sure what we'll be doing with
+        this dict, but it'll be kept here."""
         lower_name = type(cog).__name__.lower()
         if lower_name in self.lower_cogs:
             raise ClientException(
@@ -174,6 +177,8 @@ class Nyx(Bot):
         return command
 
     async def get_context(self, message, *args, cls=Context):
+        """Override latter part of context in case we actually run into
+        a disambiguation."""
         ctx = await super().get_context(message, *args, cls=Context)
         # Make sure the current command is not part of a disambiguation with
         # multiple commands.
@@ -336,6 +341,7 @@ class Nyx(Bot):
                     yield from command.walk_commands()
 
     async def on_ready(self):
+        """Just print some things here to show a connection or reconnection."""
         print("Connection established.")
         print("\033[35mNyx has awoken. " +
               "Only fools fear not of darkness...\033[0m")
@@ -363,6 +369,7 @@ class Nyx(Bot):
             return log.getvalue()
 
     def get_disambiguation(self, name, create=False):
+        """Get the dict of cogs that have a command with such a name."""
         if name not in self.disambiguations:
             if not create:
                 return None
@@ -373,6 +380,7 @@ class Nyx(Bot):
             return self.disambiguations[name]
 
     def get_namespace(self, name, create=False):
+        """Get the dict of commands from a cog of a certain name."""
         if name not in self.namespaces:
             if not create:
                 return None
