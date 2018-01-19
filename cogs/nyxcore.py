@@ -75,6 +75,11 @@ class Core:
 
     @commands.command()
     @nyxcommands.has_privilege(privilege=-1)
+    async def reload(self, _, extension):
+        self.nyx.reload_extension(extension)
+
+    @commands.command()
+    @nyxcommands.has_privilege(privilege=-1)
     async def shutdown(self, ctx):
         """Dun kill me pls..."""
         await ctx.send("Light cannot be without dark!!!")

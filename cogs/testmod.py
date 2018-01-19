@@ -8,6 +8,10 @@ class TestOne:
         self.nyx = nyx
 
     @commands.command()
+    async def asdf(self, ctx):
+        await ctx.send("no")
+
+    @commands.command()
     async def test(self, ctx):
         """Prints "asdf\""""
         await ctx.send("asdf")

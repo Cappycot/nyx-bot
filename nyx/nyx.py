@@ -19,7 +19,7 @@ Future Tasks:
  - Move all module code on repo to the new Nyx-Modules repo.
 """
 
-import inspect
+from inspect import getmembers
 import sys
 from contextlib import closing, redirect_stdout
 from io import StringIO
@@ -29,6 +29,7 @@ from os.path import isfile
 from discord import ClientException
 from discord.ext.commands import Bot, Command, CommandError, CommandNotFound, \
     Context, GroupMixin
+from discord.ext.commands.bot import _is_submodule  # lol
 from discord.ext.commands.view import StringView
 
 from nyx.nyxdata import GuildData, UserData
@@ -101,13 +102,34 @@ class Nyx(Bot):
     def add_cog(self, cog):
         """At the moment we're overriding this to have a dict of all the cogs
         based on their lowercase names. I am not sure what we'll be doing with
-        this dict, but it'll be kept here."""
+        this dict, but it'll be kept here.
+        """
         lower_name = type(cog).__name__.lower()
         if lower_name in self.lower_cogs:
             raise ClientException(
                 "The cog {} is already registered.".format(lower_name))
         self.lower_cogs[lower_name] = cog
         super().add_cog(cog)
+
+    def reload_extension(self, name):
+        """Simply unload and load the extension again. If a cog is specified,
+        search for the extension that is its parent.
+        """
+        if self.extensions.get(name) is None:
+            cog = self.lower_cogs.get(name.lower(), None)
+            if cog is None:
+                return False
+            else:
+                name = None
+                for lib in self.extensions:
+                    if _is_submodule(self.extensions[lib].__name__,
+                                     cog.__module__):
+                        name = lib
+                if name is None:
+                    return False
+        self.unload_extension(name)
+        self.load_extension(name)
+        return True
 
     def add_command(self, command):
         # Raise the usual errors from super method.
@@ -178,7 +200,8 @@ class Nyx(Bot):
 
     async def get_context(self, message, *args, cls=Context):
         """Override latter part of context in case we actually run into
-        a disambiguation."""
+        a disambiguation.
+        """
         ctx = await super().get_context(message, *args, cls=Context)
         # Make sure the current command is not part of a disambiguation with
         # multiple commands.
@@ -224,11 +247,17 @@ class Nyx(Bot):
         return ctx
 
     async def on_message(self, message):
+        """Filter out commands from bots since the library doesn't do it for
+        us anymore.
+        """
         if message.author.bot:
             return
         await self.process_commands(message)
 
     async def invoke(self, ctx):
+        """Hook into this function for sending command errors for
+        disambiguations.
+        """
         if ctx.command is not None:
             await super().invoke(ctx)
         elif ctx.invoked_with:
@@ -244,13 +273,14 @@ class Nyx(Bot):
     def remove_cog(self, name):
         """The reason I can't just call super here is because removing
         commands ideally wants a cog name to go with it because of how
-        disambiguations work."""
+        disambiguations work.
+        """
         cog = self.cogs.pop(name, None)
         self.lower_cogs.pop(name.lower(), None)
         if cog is None:
             return cog
-        members = inspect.getmembers(cog)
-        for name, member in members:
+        members = getmembers(cog)
+        for _, member in members:
             # remove commands the cog has
             if isinstance(member, Command):
                 if member.parent is None:
@@ -289,8 +319,10 @@ class Nyx(Bot):
 
     def remove_command(self, name, cog=None):
         """Will exterminate the most recently-added command bearing the
-        specified name."""
+        specified name.
+        """
         super().remove_command(name)
+        print("Remove {} from cog {}".format(name, str(cog)))
         # self.all_commands has been dealt with at this point.
         disambiguation = self.get_disambiguation(name)
         if disambiguation is None:
@@ -324,6 +356,7 @@ class Nyx(Bot):
                         for cmd in disambiguation.values():
                             self.all_commands[alias] = cmd
                     namespace.pop(alias)
+        print("{} removed".format(command))
         return command
 
     def remove_commands_named(self, name):
