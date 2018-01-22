@@ -32,9 +32,10 @@ from discord.ext.commands import Bot, Command, CommandError, CommandNotFound, \
 from discord.ext.commands.bot import _is_submodule  # lol
 from discord.ext.commands.view import StringView
 
+from nyx.nyxcommands import ModuleExclusiveCommand
 from nyx.nyxdata import GuildData, UserData
 from nyx.nyxguild import Guild
-from nyx.nyxhelp import Help
+from nyx.nyxhelp import Help, NyxHelpFormatter
 from nyx.nyxuser import User
 
 
@@ -93,7 +94,9 @@ class Nyx(Bot):
         self.guilds_folder = None
         self.user_data = {}
         self.users_folder = None
-        super().__init__(command_prefix=check_prefix, **options)
+        super(Nyx, self).__init__(command_prefix=check_prefix,
+                                  formatter=NyxHelpFormatter(width=100),
+                                  **options)
         self.remove_command("help")
         self.add_cog(Guild(self))
         self.add_cog(Help(self))
@@ -112,8 +115,8 @@ class Nyx(Bot):
         super().add_cog(cog)
 
     def reload_extension(self, name):
-        """Simply unload and load the extension again. If a cog is specified,
-        search for the extension that is its parent.
+        """Simply unload and load the extension again. If a cog is specified
+        rather than an extension, search for the extension that is its parent.
         """
         if self.extensions.get(name) is None:
             cog = self.lower_cogs.get(name.lower(), None)
@@ -139,26 +142,31 @@ class Nyx(Bot):
         # If there is already said name/alias occupying the main commands,
         # then remove it and leave it to be handled by disambiguation.
         name = command.name.lower()
-        if name not in self.all_commands:
-            self.all_commands[name] = command
-            for alias in command.aliases:
-                alias = alias.lower()
-                if alias not in self.all_commands:
-                    self.all_commands[alias] = command
-                else:
-                    del self.all_commands[alias]
-        else:
-            del self.all_commands[name]
-
-        # Add as disambiguation...
-        self.get_disambiguation(name, create=True)[
-            id(command)] = command
-        for alias in command.aliases:
-            self.get_disambiguation(alias.lower(), create=True)[
+        print(type(command))
+        print(not isinstance(command, ModuleExclusiveCommand))
+        if not isinstance(command, ModuleExclusiveCommand):
+            occupied = name in self.all_commands  # fit char line limit
+            if occupied and not self.all_commands[name].hidden:
+                del self.all_commands[name]
+            else:
+                self.all_commands[name] = command
+                for alias in command.aliases:
+                    alias = alias.lower()
+                    occupied = alias in self.all_commands
+                    if occupied and not self.all_commands[alias].hidden:
+                        del self.all_commands[alias]
+                    else:
+                        self.all_commands[alias] = command
+            # Add as disambiguation...
+            self.get_disambiguation(name, create=True)[
                 id(command)] = command
+            for alias in command.aliases:
+                self.get_disambiguation(alias.lower(), create=True)[
+                    id(command)] = command
 
         # Add to namespace...
         cog_name = command.cog_name
+        print("Added {} from cog {}".format(name, cog_name))
         if cog_name is None:
             cog_name = "none"
             # If someone makes a cog named "None" they shouldn't.
@@ -238,6 +246,7 @@ class Nyx(Bot):
                     return ctx
 
             if namespace is not None:
+                print(namespace)
                 view.skip_ws()
                 invoker = view.get_word().lower()
                 if invoker:
@@ -324,15 +333,69 @@ class Nyx(Bot):
         super().remove_command(name)
         print("Remove {} from cog {}".format(name, str(cog)))
         # self.all_commands has been dealt with at this point.
+        command = None
         disambiguation = self.get_disambiguation(name)
-        if disambiguation is None:
-            return None
+
+        # if disambiguation is None:
+        # return None
 
         # Search for command in the disambiguation.
-        command = None
-        for cmd in disambiguation.values():
-            if cog is None or str(cog) == cmd.cog_name:
-                command = cmd
+        # command = None
+        # for cmd in disambiguation.values():
+        # if cog is None or str(cog) == cmd.cog_name:
+        # command = cmd
+
+        if disambiguation is not None:
+            for cmd in disambiguation.values():
+                if str(cog).lower() == str(cmd.cog_name).lower() or len(
+                        disambiguation) == 1:
+                    command = cmd
+
+        namespace = self.get_namespace(str(cog).lower())
+        if command is None and namespace is not None:
+            command = namespace.get(name)
+        elif command is not None:
+            # cog = str(command.cog_name).lower()
+            namespace = self.get_namespace(str(command.cog_name).lower())
+
+        # We cannot find a command based on name and we weren't given a cog
+        # name in which the command might be located so we have no leads.
+        if command is None or namespace is None:
+            return command
+
+        # Remove command from disambiguation if there's an entry for it.
+        disambiguation_found = disambiguation is not None
+        if disambiguation_found:
+            disambiguation.pop(id(command))
+            for cmd in disambiguation.values():
+                if not isinstance(cmd, ModuleExclusiveCommand):
+                    if name in self.all_commands:
+                        del self.all_commands[name]
+                        break
+                    self.all_commands[name] = cmd
+
+        namespace.pop(name)
+        if name not in command.aliases:
+            for alias in command.aliases:
+                namespace.pop(alias)
+                if disambiguation_found:
+                    disambiguation = self.get_disambiguation(alias)
+                    if disambiguation is None:
+                        continue  # Should not occur.
+                    disambiguation.pop(id(command))
+                    # Maybe we should take this repeated code and put it into
+                    # a function of its own...
+                    for cmd in disambiguation.values():
+                        if not isinstance(cmd, ModuleExclusiveCommand):
+                            if name in self.all_commands:
+                                del self.all_commands[name]
+                                break
+                            self.all_commands[name] = cmd
+        print("{} removed".format(command))
+
+        # Preserve old code for now...
+        if True:
+            return command
 
         # Remove command from namespace if it is found.
         if command is not None:
