@@ -9,9 +9,11 @@ Notes:
  - Command signature is in the format [name|alias] <param> [param]
 """
 
+import re
+
 from discord.ext import commands
 from discord.ext.commands import HelpFormatter
-import re
+from discord.ext.commands.errors import CommandError
 
 _mentions_transforms = {
     '@everyone': '@\u200beveryone',
@@ -26,7 +28,7 @@ class Help:
         self.nyx = nyx
 
     @commands.command()
-    async def help(self, ctx, *commands: str):
+    async def help(self, ctx, *words: str):
         """Gives help in the form of command descriptions and usages."""
         nyx = ctx.bot
         destination = ctx.message.author if nyx.pm_help \
@@ -35,10 +37,10 @@ class Help:
         def clear_dumb_mentions(obj):
             return _mentions_transforms.get(obj.group(0), "")
 
-        if len(commands) == 0:
+        if len(words) == 0:
             pages = await nyx.formatter.format_help_for(ctx, nyx)
         else:
-            name = _mention_pattern.sub(clear_dumb_mentions, commands[0])
+            name = _mention_pattern.sub(clear_dumb_mentions, words[0])
             cog = nyx.lower_cogs.get(name.lower())
             command = None
             disambiguation = nyx.disambiguations.get(name)
@@ -47,8 +49,8 @@ class Help:
                 if cog is None:
                     await destination.send(nyx.command_not_found.format(name))
                     return
-                elif len(commands) > 1:
-                    command = nyx.namespaces.get(name.lower()).get(commands[1])
+                elif len(words) > 1:
+                    command = nyx.namespaces.get(name.lower()).get(words[1])
                     ctx.prefix = "".join(
                         [ctx.prefix, type(cog).__name__.lower(), " "])
                     start = 2
@@ -64,7 +66,7 @@ class Help:
             else:
                 command = list(disambiguation.values())[0]
             if command is not None:
-                for arg in commands[start:]:
+                for arg in words[start:]:
                     try:
                         arg = _mention_pattern.sub(clear_dumb_mentions, arg)
                         command = command.all_commands.get(arg)
@@ -91,9 +93,67 @@ class Help:
 
 
 class NyxHelpFormatter(HelpFormatter):
-    pass
 
+    async def filter_command_list(self):
+        """Returns a filtered list of commands based on the two attributes
+        provided, :attr:`show_check_failure` and :attr:`show_hidden`.
+        Also filters based on if :meth:`~.HelpFormatter.is_cog` is valid.
+        This function is modded to use Nyx's namespace system.
 
-# def setup(nyx):
-# nyx.remove_command("help")
-# nyx.add_cog(Help(nyx))
+        Returns
+        --------
+        iterable
+            An iterable with the filter being applied. The resulting value is
+            a (key, value) :class:`tuple` of the command name and the command itself.
+        """
+
+        def sane_no_suspension_point_predicate(tup):
+            cmd = tup[1]
+            if self.is_cog():
+                # filter commands that don't exist to this cog.
+                if cmd.instance is not self.command:
+                    return False
+
+            if cmd.hidden and not self.show_hidden:
+                return False
+
+            return True
+
+        async def predicate(tup):
+            if sane_no_suspension_point_predicate(tup) is False:
+                return False
+
+            cmd = tup[1]
+            try:
+                return await cmd.can_run(self.context)
+            except CommandError:
+                return False
+
+        # iterator = self.command.all_commands.items() if not self.is_cog()
+        # else self.context.bot.all_commands.items()
+        # if self.show_check_failure:
+        # return filter(sane_no_suspension_point_predicate, iterator)
+
+        # Gotta run every check and verify it
+        ret = []
+        # for elem in iterator:
+        # valid = await predicate(elem)
+        # if valid:
+        # ret.append(elem)
+
+        nyx = self.context.bot if self.is_cog() else self.command
+
+        if self.is_cog():
+            namespace = nyx.get_namespace(type(self.command).__name__.lower())
+            for elem in namespace.items():
+                valid = await predicate(elem)
+                if valid:
+                    ret.append(elem)
+        else:
+            for namespace in nyx.namespaces.values():
+                for elem in namespace.items():
+                    valid = await predicate(elem)
+                    if valid:
+                        ret.append(elem)
+
+        return ret

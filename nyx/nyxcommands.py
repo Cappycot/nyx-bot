@@ -1,4 +1,10 @@
 from discord.ext.commands import check
+from discord.ext.commands import Command
+
+
+class ModuleExclusiveCommand(Command):
+    def __init__(self, name, callback, **kwargs):
+        super(ModuleExclusiveCommand, self).__init__(name, callback, **kwargs)
 
 
 async def check_privilege(ctx, privilege: int):
