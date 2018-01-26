@@ -34,7 +34,7 @@ from discord.ext.commands.view import StringView
 
 from nyx.nyxcommands import ModuleExclusiveCommand
 from nyx.nyxdata import GuildData, UserData
-from nyx.nyxguild import Guild
+from nyx.nyxguild import NyxGuild
 from nyx.nyxhelp import Help, NyxHelpFormatter
 from nyx.nyxuser import User
 
@@ -77,13 +77,16 @@ class Nyx(Bot):
         self.command_has_disambiguation = options.pop(
             "command_has_disambiguation",
             'Command "{}" exists in multiple modules as:')
+        self.command_other_disambiguation = options.pop(
+            "command_other_disambiguation",
+            'Command "{}" also exists in other modules as:')
         self.command_no_description = options.pop("command_no_description",
                                                   "No description.")
         self.core_commands = {}
         self.disambiguations = {}
         self.lower_cogs = {}
         self.namespaces = {}
-        self.owner = None
+        self.debug = False
         # Default command prefixes that can be overwritten...
         # Using '<' as a prefix is highly not recommended as '<' is the first
         # character in a Discord mention.
@@ -95,17 +98,16 @@ class Nyx(Bot):
         self.user_data = {}
         self.users_folder = None
         super(Nyx, self).__init__(command_prefix=check_prefix,
-                                  formatter=NyxHelpFormatter(width=100),
-                                  **options)
+                                  formatter=NyxHelpFormatter(), **options)
         self.remove_command("help")
-        self.add_cog(Guild(self))
+        self.add_cog(NyxGuild(self))
         self.add_cog(Help(self))
         self.add_cog(User(self))
 
     def add_cog(self, cog):
         """At the moment we're overriding this to have a dict of all the cogs
         based on their lowercase names. I am not sure what we'll be doing with
-        this dict, but it'll be kept here.
+        this dict, but it'll be kept here for now.
         """
         lower_name = type(cog).__name__.lower()
         if lower_name in self.lower_cogs:
@@ -487,9 +489,10 @@ class Nyx(Bot):
             return self.namespaces[name]
 
     def get_guild_data(self, discord_guild):
-        """Retrieves the GuildData object for a particular Discord guild.
-        If such GuildData does not exist, then create a new object to hold
-        data.
+        """Retrieves the GuildData object for a particular Discord Guild. If
+        such GuildData does not exist, then create a new object to hold
+        data. This is guaranteed to never return None unless None is passed
+        as an argument.
         """
         if discord_guild is None:
             return None
@@ -504,6 +507,10 @@ class Nyx(Bot):
             return self.guild_data[discord_guild.id]
 
     def get_user_data(self, discord_user):
+        """Retrieves the UserData object for a particular Discord User. If such
+        UserData does not exist, then create a new object to hold data. This is
+        guaranteed to never return None unless None is passed as an argument.
+        """
         if discord_user is None:
             return None
         # Quack quack.
