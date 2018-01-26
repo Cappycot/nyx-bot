@@ -35,3 +35,10 @@ def has_privilege_or_permissions(privilege=1, **perms):
                    perms.items())
 
     return check(predicate)
+
+
+def is_debug():
+    async def predicate(ctx):
+        return ctx.bot.debug
+
+    return check(predicate)

@@ -16,7 +16,6 @@ Current Tasks:
 Future Tasks:
  - Split Nyx up into Nyx and AutoShardedNyx and have original
    be NyxBase...
- - Move all module code on repo to the new Nyx-Modules repo.
 """
 
 from inspect import getmembers
