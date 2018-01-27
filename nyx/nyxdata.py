@@ -18,6 +18,7 @@ class GuildData:
                 return name
         return None
 
+    # TODO: Revise guild module import system.
     def import_module(self, nyx, mod):
         mod = mod.lower()
         if mod in self.modules:

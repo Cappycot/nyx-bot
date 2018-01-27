@@ -2,7 +2,7 @@
 Here we need to replace the default help command to be able to deal with
 disambiguations while feeding same or similar information to HelpFormatters...
 
-Possible solutions for injecting disambiguation information:
+Possible solutions for accounting for disambiguation information:
  - Injecting the cog name (lowercase probably) into the Context prefix.
 
 Notes:
@@ -14,6 +14,8 @@ import re
 from discord.ext import commands
 from discord.ext.commands import HelpFormatter
 from discord.ext.commands.errors import CommandError
+
+from nyx.nyxcommands import ModuleExclusiveCommand
 
 _mentions_transforms = {
     '@everyone': '@\u200beveryone',
@@ -42,10 +44,16 @@ class Help:
         else:
             name = _mention_pattern.sub(clear_dumb_mentions, words[0])
             cog = nyx.lower_cogs.get(name.lower())
+            print(name)
             command = None
+            # Search guild namespace for commands.
+            if ctx.guild is not None:
+                guild = nyx.get_guild_data(ctx.guild)
+                if name.lower() in guild.command_map:
+                    command = guild.command_map[name.lower()]
             disambiguation = nyx.disambiguations.get(name)
             start = 1
-            if disambiguation is None:
+            if disambiguation is None and command is None:
                 if cog is None:
                     await destination.send(nyx.command_not_found.format(name))
                     return
@@ -54,16 +62,17 @@ class Help:
                     ctx.prefix = "".join(
                         [ctx.prefix, type(cog).__name__.lower(), " "])
                     start = 2
-            elif len(disambiguation) > 1:
+            elif disambiguation is not None and len(disambiguation) > 1:
                 command_text = nyx.command_has_disambiguation.format(name)
-                for command in disambiguation.values():
+                for d_command in disambiguation.values():
                     command_text += nyx.command_disambiguation.format("".join(
-                        [ctx.prefix, command.cog_name.lower(), " ",
-                         command.name.lower()]),
-                        command.help or nyx.command_no_description)
+                        [ctx.prefix, d_command.cog_name.lower(), " ",
+                         d_command.name.lower()]),
+                        d_command.help or nyx.command_no_description)
                 await destination.send(command_text)
-                return
-            else:
+                if command is None:
+                    return
+            elif command is None:
                 command = list(disambiguation.values())[0]
             if command is not None:
                 for arg in words[start:]:
@@ -93,6 +102,26 @@ class Help:
 
 
 class NyxHelpFormatter(HelpFormatter):
+    """Tweaked default HelpFormatter for how Nyx's command system works."""
+
+    def _add_subcommands_to_page(self, max_width, commands):
+        """A lot of this work is under the hood because of the tweaks Nyx's
+        new command system does.
+        """
+        for name, command in commands:
+            if name in command.aliases:
+                # skip aliases
+                continue
+            # need_module = isinstance(command, ModuleExclusiveCommand)
+            if isinstance(command, ModuleExclusiveCommand):
+                name = "{} {}".format(command.cog_name.lower(), name)
+            if len(command.short_doc) > 0:
+                entry = '  {0:<{width}} - {1}'.format(name, command.short_doc,
+                                                      width=max_width)
+            else:
+                entry = "  {0:<{width}}".format(name, width=max_width)
+            shortened = self.shorten(entry)
+            self._paginator.add_line(shortened)
 
     async def filter_command_list(self):
         """Returns a filtered list of commands based on the two attributes

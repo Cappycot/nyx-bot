@@ -17,7 +17,7 @@ prefix_add_alias = ["a", "add"]
 prefix_rem_alias = ["d", "del", "r", "rem", "remove"]
 
 
-class Guild:
+class NyxGuild:
     def __init__(self, nyx):
         self.folder = default_folder
         self.nyx = nyx
