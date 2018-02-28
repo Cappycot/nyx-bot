@@ -18,9 +18,9 @@ Future Tasks:
    be NyxBase...
 """
 
-from inspect import getmembers
 import sys
 from contextlib import closing, redirect_stdout
+from inspect import getmembers
 from io import StringIO
 from os import getcwd, listdir
 from os.path import isfile
@@ -31,11 +31,10 @@ from discord.ext.commands import Bot, Command, CommandError, CommandNotFound, \
 from discord.ext.commands.bot import _is_submodule  # lol
 from discord.ext.commands.view import StringView
 
-from nyx.nyxcommands import ModuleExclusiveCommand
+from nyx.nyxcommands import is_module_exclusive
 from nyx.nyxdata import GuildData, UserData
 from nyx.nyxguild import NyxGuild
-from nyx.nyxhelp import Help, NyxHelpFormatter
-from nyx.nyxuser import User
+from nyx.nyxhelp import NyxHelp, NyxHelpFormatter
 
 
 class CommandHasDisambiguation(CommandError):
@@ -92,6 +91,7 @@ class Nyx(Bot):
         self.prefixes = ["$", "~", "!", "%", "^", "&", "*", "-", "=", ",", ".",
                          ">", "/", "?"]
         self.separate = False
+        self.guild_cog = None
         self.guild_data = {}
         self.guilds_folder = None
         self.user_data = {}
@@ -99,9 +99,10 @@ class Nyx(Bot):
         super(Nyx, self).__init__(command_prefix=check_prefix,
                                   formatter=NyxHelpFormatter(), **options)
         self.remove_command("help")
-        self.add_cog(NyxGuild(self))
-        self.add_cog(Help(self))
-        self.add_cog(User(self))
+        self.guild_cog = NyxGuild(self)
+        self.add_cog(self.guild_cog)
+        self.add_cog(NyxHelp(self))
+        # self.add_cog(User(self))
 
     def add_cog(self, cog):
         """At the moment we're overriding this to have a dict of all the cogs
@@ -144,8 +145,8 @@ class Nyx(Bot):
         # then remove it and leave it to be handled by disambiguation.
         name = command.name.lower()
         print(type(command))
-        print(not isinstance(command, ModuleExclusiveCommand))
-        if not isinstance(command, ModuleExclusiveCommand):
+        print(not is_module_exclusive(command))
+        if not is_module_exclusive(command):
             occupied = name in self.all_commands  # fit char line limit
             if occupied and not self.all_commands[name].hidden:
                 del self.all_commands[name]
@@ -369,7 +370,7 @@ class Nyx(Bot):
         if disambiguation_found:
             disambiguation.pop(id(command))
             for cmd in disambiguation.values():
-                if not isinstance(cmd, ModuleExclusiveCommand):
+                if not is_module_exclusive(cmd):
                     if name in self.all_commands:
                         del self.all_commands[name]
                         break
@@ -387,7 +388,7 @@ class Nyx(Bot):
                     # Maybe we should take this repeated code and put it into
                     # a function of its own...
                     for cmd in disambiguation.values():
-                        if not isinstance(cmd, ModuleExclusiveCommand):
+                        if not is_module_exclusive(cmd):
                             if name in self.all_commands:
                                 del self.all_commands[name]
                                 break
@@ -521,6 +522,7 @@ class Nyx(Bot):
         return user
 
     def load_cogs(self, folder=None):
+        """Load extensions from a certain folder."""
         if folder is not None:
             self.cogs_folder = folder
         if self.cogs_folder is None:
@@ -534,6 +536,13 @@ class Nyx(Bot):
             if mod_path.endswith(".py"):
                 self.load_extension(mod_path[:-3])
         return True
+
+    def run(self, *args, **kwargs):
+        """By now we've initialized all modules so we can go ahead and map
+        commands for guilds that have imported modules.
+        """
+        self.guild_cog.load_all_guild_data()
+        super().run(*args, **kwargs)
 
     async def reply(self, ctx, content):
         if ctx.message.guild is None:

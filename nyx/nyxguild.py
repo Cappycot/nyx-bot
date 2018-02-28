@@ -21,7 +21,7 @@ class NyxGuild:
     def __init__(self, nyx):
         self.folder = default_folder
         self.nyx = nyx
-        self.load_all_guild_data()
+        # self.load_all_guild_data()
         # Test of saving...
         # gd = GuildData(1234)
         # self.nyx.guild_data[1234] = gd
@@ -41,8 +41,11 @@ class NyxGuild:
                 settings = config["Settings"]
                 # print(guild_data.modules)
                 if "Modules" in settings and settings["Modules"]:
-                    guild_data.modules.extend(
-                        settings["Modules"].split(" "))
+                    # guild_data.modules.extend(
+                    # settings["Modules"].split(" "))
+                    for module_name in settings["Modules"].split():
+                        print(module_name)
+                        print(guild_data.import_module(self.nyx, module_name))
                 # print(guild_data.modules)
                 if "Prefixes" in settings and settings["Prefixes"]:
                     guild_data.prefixes.extend(
@@ -118,7 +121,7 @@ class NyxGuild:
                                                 "find them..."]))
         else:
             self.save_guild_data(guild_data.id)
-            await respond(ctx, "Added module(s)" + list_string(changed))
+            await respond(ctx, "Added module(s) " + list_string(changed))
 
     @module.command(name="list")
     @commands.guild_only()
