@@ -119,6 +119,8 @@ class Nyx(Bot):
     def reload_extension(self, name):
         """Simply unload and load the extension again. If a cog is specified
         rather than an extension, search for the extension that is its parent.
+        If both a cog and extension share the same name, the extension will
+        take priority.
         """
         if self.extensions.get(name) is None:
             cog = self.lower_cogs.get(name.lower(), None)
