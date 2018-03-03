@@ -15,7 +15,7 @@ from discord.ext import commands
 from discord.ext.commands import HelpFormatter
 from discord.ext.commands.errors import CommandError
 
-from nyx.nyxcommands import ModuleExclusiveCommand
+from nyx.nyxcommands import is_module_exclusive
 
 _mentions_transforms = {
     '@everyone': '@\u200beveryone',
@@ -25,7 +25,7 @@ _mentions_transforms = {
 _mention_pattern = re.compile('|'.join(_mentions_transforms.keys()))
 
 
-class Help:
+class NyxHelp:
     def __init__(self, nyx):
         self.nyx = nyx
 
@@ -104,6 +104,22 @@ class Help:
 class NyxHelpFormatter(HelpFormatter):
     """Tweaked default HelpFormatter for how Nyx's command system works."""
 
+    @property
+    def max_name_size(self):
+        """:class:`int`: Returns the largest name length of a command or, if it
+        has subcommands, the largest subcommand name.
+
+        Need to override this to take into account module exclusive commands
+        which need to have the module name specified again in the help text...
+        """
+        try:
+            commands = self.command.all_commands if not self.is_cog() else self.context.bot.all_commands
+            if commands:
+                return max(map(lambda c: len(c.name) if self.show_hidden or not c.hidden else 0, commands.values()))
+            return 0
+        except AttributeError:
+            return len(self.command.name)
+
     def _add_subcommands_to_page(self, max_width, commands):
         """A lot of this work is under the hood because of the tweaks Nyx's
         new command system does.
@@ -113,7 +129,7 @@ class NyxHelpFormatter(HelpFormatter):
                 # skip aliases
                 continue
             # need_module = isinstance(command, ModuleExclusiveCommand)
-            if isinstance(command, ModuleExclusiveCommand):
+            if is_module_exclusive(command):
                 name = "{} {}".format(command.cog_name.lower(), name)
             if len(command.short_doc) > 0:
                 entry = '  {0:<{width}} - {1}'.format(name, command.short_doc,
@@ -133,7 +149,8 @@ class NyxHelpFormatter(HelpFormatter):
         --------
         iterable
             An iterable with the filter being applied. The resulting value is
-            a (key, value) :class:`tuple` of the command name and the command itself.
+            a (key, value) :class:`tuple` of the command name and the command
+            itself.
         """
 
         def sane_no_suspension_point_predicate(tup):

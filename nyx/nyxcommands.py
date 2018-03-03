@@ -1,10 +1,15 @@
 from discord.ext.commands import check
-from discord.ext.commands import Command
+from discord.ext.commands import Command, Group
 
 
 class ModuleExclusiveCommand(Command):
     def __init__(self, name, callback, **kwargs):
         super(ModuleExclusiveCommand, self).__init__(name, callback, **kwargs)
+
+
+class ModuleExclusiveGroup(Group):
+    def __init__(self, **attrs):
+        super(ModuleExclusiveGroup, self).__init__(**attrs)
 
 
 async def check_privilege(ctx, privilege: int):
@@ -42,3 +47,9 @@ def is_debug():
         return ctx.bot.debug
 
     return check(predicate)
+
+
+def is_module_exclusive(command):
+    if isinstance(command, ModuleExclusiveCommand):
+        return True
+    return isinstance(command, ModuleExclusiveGroup)
