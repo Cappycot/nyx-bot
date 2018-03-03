@@ -146,8 +146,8 @@ class Nyx(Bot):
         # If there is already said name/alias occupying the main commands,
         # then remove it and leave it to be handled by disambiguation.
         name = command.name.lower()
-        print(type(command))
-        print(not is_module_exclusive(command))
+        # print(type(command))
+        # print(not is_module_exclusive(command))
         if not is_module_exclusive(command):
             occupied = name in self.all_commands  # fit char line limit
             if occupied and not self.all_commands[name].hidden:
@@ -250,7 +250,7 @@ class Nyx(Bot):
                     return ctx
 
             if namespace is not None:
-                print(namespace)
+                # print(namespace)
                 view.skip_ws()
                 invoker = view.get_word().lower()
                 if invoker:
@@ -335,7 +335,7 @@ class Nyx(Bot):
         specified name.
         """
         super().remove_command(name)
-        print("Remove {} from cog {}".format(name, str(cog)))
+        # print("Remove {} from cog {}".format(name, str(cog)))
         # self.all_commands has been dealt with at this point.
         command = None
         disambiguation = self.get_disambiguation(name)
@@ -395,7 +395,7 @@ class Nyx(Bot):
                                 del self.all_commands[name]
                                 break
                             self.all_commands[name] = cmd
-        print("{} removed".format(command))
+        # print("{} removed".format(command))
 
         # Preserve old code for now...
         if True:
