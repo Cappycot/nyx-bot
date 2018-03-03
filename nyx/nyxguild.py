@@ -96,10 +96,21 @@ class NyxGuild:
         for gid in self.nyx.guild_data:
             self.save_guild_data(gid)
 
+    async def list_modules(self, ctx):
+        """Replies with the list of modules on the server."""
+        guild_data = self.nyx.get_guild_data(ctx.message.guild)
+        plural = len(guild_data.modules) > 1
+        result = list_string(guild_data.modules)
+        await self.nyx.reply(ctx, "".join(["Module", "s" if plural else "",
+                                           " for this server ",
+                                           "are " if plural else "is ",
+                                           result]))
+
     @commands.group(aliases=["modules"])
     async def module(self, ctx):
         """List, add, or remove modules from a server."""
-        pass
+        if ctx.invoked_subcommand is None:
+            await self.list_modules(ctx)
 
     @module.command(name="add", aliases=["a", "i", "import"])
     @commands.guild_only()
@@ -127,13 +138,7 @@ class NyxGuild:
     @commands.guild_only()
     async def module_list(self, ctx):
         """Lists the modules on the server."""
-        guild_data = self.nyx.get_guild_data(ctx.message.guild)
-        plural = len(guild_data.modules) > 1
-        result = list_string(guild_data.modules)
-        await self.nyx.reply(ctx, "".join(["Module", "s" if plural else "",
-                                           " for this server ",
-                                           "are " if plural else "is ",
-                                           result]))
+        await self.list_modules(ctx)
 
     @module.command(name="remove",
                     aliases=["d", "del", "deport", "r", "rem", "rm"])
@@ -155,7 +160,7 @@ class NyxGuild:
                 ["I couldn't find such a", "module to remove."]))
         else:
             self.save_guild_data(guild_data.id)
-            await respond(ctx, "Removed module(s)" + list_string(changed))
+            await respond(ctx, "Removed module(s) " + list_string(changed))
 
     @commands.command(aliases=["prefixes"])
     @commands.guild_only()
