@@ -81,9 +81,9 @@ class Nyx(Bot):
         self.command_no_description = options.pop("command_no_description",
                                                   "No description.")
         self.core_commands = {}
-        self.disambiguations = {}
+        self.disambiguations = {}  # {command name:{object id:command}}
         self.lower_cogs = {}
-        self.namespaces = {}
+        self.namespaces = {}  # {cog name:{command name:command}}
         self.debug = False
         # Default command prefixes that can be overwritten...
         # Using '<' as a prefix is highly not recommended as '<' is the first
@@ -165,7 +165,7 @@ class Nyx(Bot):
             self.get_disambiguation(name, create=True)[
                 id(command)] = command
             for alias in command.aliases:
-                self.get_disambiguation(alias.lower(), create=True)[
+                self.get_disambiguation(alias, create=True)[
                     id(command)] = command
 
         # Add to namespace...
@@ -355,12 +355,12 @@ class Nyx(Bot):
                         disambiguation) == 1:
                     command = cmd
 
-        namespace = self.get_namespace(str(cog).lower())
+        namespace = self.get_namespace(str(cog))
         if command is None and namespace is not None:
             command = namespace.get(name)
         elif command is not None:
             # cog = str(command.cog_name).lower()
-            namespace = self.get_namespace(str(command.cog_name).lower())
+            namespace = self.get_namespace(str(command.cog_name))
 
         # We cannot find a command based on name and we weren't given a cog
         # name in which the command might be located so we have no leads.
@@ -403,7 +403,7 @@ class Nyx(Bot):
 
         # Remove command from namespace if it is found.
         if command is not None:
-            namespace = self.get_namespace(str(command.cog_name).lower())
+            namespace = self.get_namespace(str(command.cog_name))
             if namespace is None:
                 return command  # Should not occur.
             disambiguation.pop(id(command))
@@ -469,7 +469,10 @@ class Nyx(Bot):
             return log.getvalue()
 
     def get_disambiguation(self, name, create=False):
-        """Get the dict of cogs that have a command with such a name."""
+        """Get the dict of cogs that have a command with such a name. This is
+        case-insensitive.
+        """
+        name = name.lower()
         if name not in self.disambiguations:
             if not create:
                 return None
@@ -480,7 +483,10 @@ class Nyx(Bot):
             return self.disambiguations[name]
 
     def get_namespace(self, name, create=False):
-        """Get the dict of commands from a cog of a certain name."""
+        """Get the dict of commands from a cog of a certain name. This is case-
+        insensitive.
+        """
+        name = name.lower()
         if name not in self.namespaces:
             if not create:
                 return None
