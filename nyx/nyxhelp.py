@@ -44,7 +44,7 @@ class NyxHelp:
         else:
             name = _mention_pattern.sub(clear_dumb_mentions, words[0])
             cog = nyx.lower_cogs.get(name.lower())
-            print(name)
+            # print(name)
             command = None
             # Search guild namespace for commands.
             if ctx.guild is not None:
@@ -101,6 +101,27 @@ class NyxHelp:
             await destination.send(page)
 
 
+def max_namespace_size(cog_name, namespace, show_hidden):
+    """Get the length of the longest command name in a given namespace for
+    the NyxHelpFormatter.
+    """
+    max_name = 0
+    for command_name in namespace:
+        command = namespace[command_name]
+        if command_name in command.aliases:
+            continue
+        elif command.hidden and not show_hidden:
+            continue
+        # print("{}: {}".format(command_name, type(command).__name__))
+        if is_module_exclusive(command):
+            # print(len(command_name) + len(cog_name) + 1)
+            max_name = max(len(command_name) + len(cog_name) + 1, max_name)
+        else:
+            # print(len(command_name))
+            max_name = max(len(command_name), max_name)
+    return max_name
+
+
 class NyxHelpFormatter(HelpFormatter):
     """Tweaked default HelpFormatter for how Nyx's command system works."""
 
@@ -112,13 +133,23 @@ class NyxHelpFormatter(HelpFormatter):
         Need to override this to take into account module exclusive commands
         which need to have the module name specified again in the help text...
         """
-        try:
-            commands = self.command.all_commands if not self.is_cog() else self.context.bot.all_commands
-            if commands:
-                return max(map(lambda c: len(c.name) if self.show_hidden or not c.hidden else 0, commands.values()))
-            return 0
-        except AttributeError:
+        max_name = 0
+        if self.is_bot():
+            for cog_name in self.command.namespaces:
+                namespace = self.command.get_namespace(cog_name)
+                max_name = max(max_name,
+                               max_namespace_size(cog_name, namespace,
+                                                  self.show_hidden))
+        elif self.is_cog():
+            cog_name = type(self.command).__name__
+            namespace = self.context.bot.get_namespace(cog_name)
+            return max_namespace_size(cog_name, namespace, self.show_hidden)
+        elif self.has_subcommands():
+            for sub_name in self.command.all_commands:
+                max_name = max(max_name, len(sub_name))
+        else:
             return len(self.command.name)
+        return max_name
 
     def _add_subcommands_to_page(self, max_width, commands):
         """A lot of this work is under the hood because of the tweaks Nyx's
@@ -169,37 +200,34 @@ class NyxHelpFormatter(HelpFormatter):
             if sane_no_suspension_point_predicate(tup) is False:
                 return False
 
+            if self.show_check_failure:
+                return True
+
             cmd = tup[1]
             try:
                 return await cmd.can_run(self.context)
             except CommandError:
                 return False
 
-        # iterator = self.command.all_commands.items() if not self.is_cog()
-        # else self.context.bot.all_commands.items()
-        # if self.show_check_failure:
-        # return filter(sane_no_suspension_point_predicate, iterator)
+        nyx = self.context.bot if self.is_cog() else self.command
+        ret = []
 
         # Gotta run every check and verify it
-        ret = []
-        # for elem in iterator:
-        # valid = await predicate(elem)
-        # if valid:
-        # ret.append(elem)
-
-        nyx = self.context.bot if self.is_cog() else self.command
-
-        if self.is_cog():
-            namespace = nyx.get_namespace(type(self.command).__name__.lower())
-            for elem in namespace.items():
-                valid = await predicate(elem)
-                if valid:
-                    ret.append(elem)
-        else:
+        if self.is_bot():
             for namespace in nyx.namespaces.values():
                 for elem in namespace.items():
                     valid = await predicate(elem)
                     if valid:
                         ret.append(elem)
-
+        elif self.is_cog():
+            namespace = nyx.get_namespace(type(self.command).__name__)
+            for elem in namespace.items():
+                valid = await predicate(elem)
+                if valid:
+                    ret.append(elem)
+        elif self.has_subcommands():
+            for elem in self.command.all_commands.items():
+                valid = await predicate(elem)
+                if valid:
+                    ret.append(elem)
         return ret
