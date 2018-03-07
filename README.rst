@@ -1,15 +1,16 @@
-# Nyx
-## A random Discord Bot
+Nyx
+===
 
-### Installation:
+A random Discord Bot
+
+Installation:
+=============
 
 Nyx uses the rewritten (WIP) version of Rapptz's discord.py library.
 
-#### Configuring "info.nyx"
+Configuring "info.nyx" is currently a WIP...
 
-Currently a WIP...
-
-### To Do:
+To Do:
 
 - [x] Make repository
 - [x] Turn module system back to standard Discord cog system so I can not be stupid
