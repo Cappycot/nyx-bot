@@ -1,21 +1,17 @@
 Nyx
 ===
 
-A random Discord Bot
+A random Discord bot platform.
 
 Installation:
 =============
 
 Nyx uses the rewritten (WIP) version of Rapptz's discord.py library.
 
-Configuring "info.nyx" is currently a WIP...
+First get Python 3.5+ with Pip and install discord.py:
 
-To Do:
+``python3 -m pip install -U git+https://github.com/Rapptz/discord.py@rewrite#egg=discord.py[voice]``
 
-- [x] Make repository
-- [x] Turn module system back to standard Discord cog system so I can not be stupid
-- [ ] Rewrite README.md
-- [ ] Turn the entire framework into an importable library
-- [ ] Move unimportant cogs to another repository
+Then you can install Nyx with:
 
-gg this formatting is all probably broken...
+``python3 -m pip install -U git+https://github.com/Cappycot/nyx``
