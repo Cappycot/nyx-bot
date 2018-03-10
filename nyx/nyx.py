@@ -8,12 +8,10 @@ https://drive.google.com/open?id=0B94jrO7TTwmORFlpeTJ1Z09UVEU
 
 clear; python3 nyx.py &
 
-Current Tasks:
- - Adapt Nyx to be something we can install with pip
+Future Tasks:
  - Rewrite task scheduling? (Clocks)
  - Add "dirty" boolean to Guild/UserData for write back optimization.
  - Conform to Python styling guidelines laid out in PEP 8.
-Future Tasks:
  - Split Nyx up into Nyx and AutoShardedNyx and have original
    be NyxBase...
 """
@@ -80,9 +78,9 @@ class Nyx(Bot):
             'Command "{}" also exists in other modules as:')
         self.command_no_description = options.pop("command_no_description",
                                                   "No description.")
-        self.core_commands = {}
+        # self.core_commands = {}  # I don't think we'll be using this.
         self.disambiguations = {}  # {command name:{object id:command}}
-        self.lower_cogs = {}
+        self.lower_cogs = {}  # {cog name:cog} with lowercase cog names
         self.namespaces = {}  # {cog name:{command name:command}}
         self.debug = False
         # Default command prefixes that can be overwritten...
@@ -530,7 +528,9 @@ class Nyx(Bot):
         return user
 
     def load_cogs(self, folder=None):
-        """Load extensions from a certain folder."""
+        """Load extensions from a certain folder. This will add the folder to
+        the sys path so we can just load extensions by the python file name.
+        """
         if folder is not None:
             self.cogs_folder = folder
         if self.cogs_folder is None:
