@@ -1,8 +1,8 @@
 """Default loader for user-specific data."""
 
 from configparser import ConfigParser, ParsingError
-from os import getcwd, listdir
-from os.path import isfile, join
+from os import getcwd, listdir, mkdir
+from os.path import isfile, join, exists
 
 # from discord.ext import commands
 from nyx.nyxdata import UserData
@@ -46,6 +46,15 @@ class User:
         if self.folder is None:
             return False
         path = join(getcwd(), self.folder)
+        if not exists(path):
+            mkdir(path)
+            print(
+                "New {} directory created for user data.".format(self.folder))
+            return True
+        elif isfile(path):
+            print("Cannot use {} for user data; blocked by file.".format(
+                self.folder))
+            return False
         for uid in listdir(path):
             user_path = join(path, uid)
             if not isfile(user_path):
