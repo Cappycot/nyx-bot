@@ -98,11 +98,7 @@ guilds/
 users/
 music/
 
-# Frick PyCharm
+# PyCharm files:
 dictionaries/
 .idea/
-
-# AWS Items
-*.pem
-*.sh
 
