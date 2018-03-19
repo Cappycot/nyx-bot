@@ -33,6 +33,7 @@ from nyx.nyxcommands import is_module_exclusive
 from nyx.nyxdata import GuildData, UserData
 from nyx.nyxguild import NyxGuild
 from nyx.nyxhelp import NyxHelp, NyxHelpFormatter
+from nyx.nyxuser import NyxUser
 
 
 class CommandHasDisambiguation(CommandError):
@@ -92,6 +93,7 @@ class Nyx(Bot):
         self.guild_cog = None
         self.guild_data = {}
         self.guilds_folder = None
+        self.user_cog = None
         self.user_data = {}
         self.users_folder = None
         super(Nyx, self).__init__(command_prefix=check_prefix,
@@ -100,7 +102,8 @@ class Nyx(Bot):
         self.guild_cog = NyxGuild(self)
         self.add_cog(self.guild_cog)
         self.add_cog(NyxHelp(self))
-        # self.add_cog(User(self))
+        self.user_cog = NyxUser(self)
+        self.add_cog(self.user_cog)
 
     def add_cog(self, cog):
         """At the moment we're overriding this to have a dict of all the cogs
@@ -550,6 +553,7 @@ class Nyx(Bot):
         commands for guilds that have imported modules.
         """
         self.guild_cog.load_all_guild_data()
+        self.user_cog.load_all_user_data()
         super().run(*args, **kwargs)
 
     async def reply(self, ctx, content):

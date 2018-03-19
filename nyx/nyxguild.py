@@ -58,8 +58,6 @@ class NyxGuild:
     def load_all_guild_data(self):
         if self.nyx.guilds_folder is not None:
             self.folder = self.nyx.guilds_folder
-        if self.folder is None:
-            return False
         path = join(getcwd(), self.folder)
         if not exists(path):
             mkdir(path)

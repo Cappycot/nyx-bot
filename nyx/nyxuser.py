@@ -10,7 +10,7 @@ from nyx.nyxdata import UserData
 default_folder = "users"
 
 
-class User:
+class NyxUser:
     def __init__(self, nyx):
         self.folder = default_folder
         self.nyx = nyx
@@ -43,8 +43,6 @@ class User:
     def load_all_user_data(self):
         if self.nyx.users_folder is not None:
             self.folder = self.nyx.users_folder
-        if self.folder is None:
-            return False
         path = join(getcwd(), self.folder)
         if not exists(path):
             mkdir(path)
