@@ -25,13 +25,16 @@ class NyxUser:
     def load_user_data(self, uid, path=None):
         user_data = UserData(int(uid))
         self.nyx.user_data[int(uid)] = user_data
+        # Can specify external path for user's data if needed.
         if path is None:
             path = join(getcwd(), self.folder, str(uid))
         config = ConfigParser()
         with open(path) as file:
             config.read_file(file)
+            # Set user privilege value.
             if "Privilege" in config and "privilege" in config["Privilege"]:
                 user_data.set_privilege(int(config["Privilege"]["privilege"]))
+            # Set other user data that other modules may have created.
             if "Data" in config:
                 data = config["Data"]
                 for key in data:
@@ -40,10 +43,14 @@ class NyxUser:
                         continue
                     user_data.data[key] = data.get(key, None)
 
-    def load_all_user_data(self):
-        if self.nyx.users_folder is not None:
+    def load_all_user_data(self, folder: str=None, path: str=None):
+        if folder is not None:
+            self.folder = folder
+        elif self.nyx.users_folder is not None:
             self.folder = self.nyx.users_folder
-        path = join(getcwd(), self.folder)
+        if path is None:
+            path = join(getcwd(), self.folder)
+        # Folder checks.
         if not exists(path):
             mkdir(path)
             print(
@@ -53,6 +60,7 @@ class NyxUser:
             print("Cannot use {} for user data; blocked by file.".format(
                 self.folder))
             return False
+        # Load user data for all files found.
         for uid in listdir(path):
             user_path = join(path, uid)
             if not isfile(user_path):

@@ -32,6 +32,7 @@ class NyxGuild:
     def load_guild_data(self, gid, path=None):
         guild_data = GuildData(int(gid))
         self.nyx.guild_data[int(gid)] = guild_data
+        # Can specify external path for guild's data if needed.
         if path is None:
             path = join(getcwd(), self.folder, str(gid))
         config = ConfigParser()
@@ -40,6 +41,7 @@ class NyxGuild:
             if "Settings" in config:
                 settings = config["Settings"]
                 # print(guild_data.modules)
+                # Get modules that have been imported into the guild.
                 if "Modules" in settings and settings["Modules"]:
                     # guild_data.modules.extend(
                     # settings["Modules"].split(" "))
@@ -47,26 +49,34 @@ class NyxGuild:
                         print(module_name)
                         print(guild_data.import_module(self.nyx, module_name))
                 # print(guild_data.modules)
+                # Get prefixes that the guild uses.
                 if "Prefixes" in settings and settings["Prefixes"]:
                     guild_data.prefixes.extend(
                         settings["Prefixes"].split(" "))
+            # Set other guild data that other modules may have created.
             if "Data" in config:
                 data = config["Data"]
                 for key in data:
                     guild_data.data[key] = data.get(key, None)
 
-    def load_all_guild_data(self):
-        if self.nyx.guilds_folder is not None:
+    def load_all_guild_data(self, folder: str = None, path: str = None):
+        if folder is not None:
+            self.folder = folder
+        elif self.nyx.guilds_folder is not None:
             self.folder = self.nyx.guilds_folder
-        path = join(getcwd(), self.folder)
+        if path is None:
+            path = join(getcwd(), self.folder)
+        # Folder checks.
         if not exists(path):
             mkdir(path)
-            print("New {} directory created for guild data.".format(self.folder))
+            print(
+                "New {} directory created for guild data.".format(self.folder))
             return True
         elif isfile(path):
             print("Cannot use {} for guild data; blocked by file.".format(
                 self.folder))
             return False
+        # Load guild data for all files found.
         for gid in listdir(path):
             guild_path = join(path, gid)
             if not isfile(guild_path):
