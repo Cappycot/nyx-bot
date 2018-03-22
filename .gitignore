@@ -97,8 +97,3 @@ cogs/
 guilds/
 users/
 music/
-
-# PyCharm files:
-dictionaries/
-.idea/
-
