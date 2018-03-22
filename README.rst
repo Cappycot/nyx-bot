@@ -1,7 +1,9 @@
 Nyx
 ===
 
-.. image:: https://img.shields.io/codeclimate/maintainability/Cappycot/nyx.svg   :alt: Code Climate   :target: https://codeclimate.com/github/Cappycot/nyx
+.. image:: https://img.shields.io/codeclimate/maintainability/Cappycot/nyx.svg
+    :alt: Code Climate
+    :target: https://codeclimate.com/github/Cappycot/nyx
 
 A random Discord bot platform.
 
