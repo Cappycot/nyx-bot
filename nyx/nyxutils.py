@@ -69,16 +69,9 @@ def list_string(alist, key=lambda a: a):
     elif len(alist) < 2:
         return str(key(alist[0]))
     elif len(alist) == 2:
-        return str(key(alist[0])) + " and " + str(key(alist[1]))
-    result = ""
-    count = 0
-    for item in alist:
-        count += 1
-        if count == len(alist):
-            result += "and " + str(key(item))
-        else:
-            result += str(key(item)) + ", "
-    return result
+        return "{} and {}".format(str(key(alist[0])), str(key(alist[1])))
+    alist = list(map(str, map(key, alist)))
+    return ", and ".join([", ".join(alist[:-1]), alist[-1]])
 
 
 def print_line():
