@@ -1,3 +1,6 @@
+from discord.ext.commands import Cog
+
+
 class GuildData:
     """Class for holding preference data for Discord guilds
     in terms of custom modules imported and prefixes to use.

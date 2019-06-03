@@ -5,12 +5,13 @@ from os import getcwd, listdir, mkdir
 from os.path import isfile, join, exists
 
 # from discord.ext import commands
+from discord.ext.commands import Cog
 from nyx.nyxdata import UserData
 
 default_folder = "users"
 
 
-class NyxUser:
+class NyxUser(Cog):
     def __init__(self, nyx):
         self.folder = default_folder
         self.nyx = nyx

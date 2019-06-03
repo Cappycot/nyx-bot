@@ -32,7 +32,7 @@ from discord.ext.commands.view import StringView
 from nyx.nyxcommands import is_module_exclusive
 from nyx.nyxdata import GuildData, UserData
 from nyx.nyxguild import NyxGuild
-from nyx.nyxhelp import NyxHelp, NyxHelpFormatter
+# from nyx.nyxhelp import NyxHelp, NyxHelpCommand  # TODO: Work on specialized HelpCommand
 from nyx.nyxuser import NyxUser
 
 
@@ -96,12 +96,12 @@ class Nyx(Bot):
         self.user_cog = None
         self.user_data = {}
         self.users_folder = None
-        super(Nyx, self).__init__(command_prefix=check_prefix,
-                                  formatter=NyxHelpFormatter(), **options)
-        self.remove_command("help")
+        super(Nyx, self).__init__(command_prefix=check_prefix, **options)  # TODO: Fix help formatting if still exists.
+        # formatter=NyxHelpFormatter(), **options)
+        # self.remove_command("help")
         self.guild_cog = NyxGuild(self)
         self.add_cog(self.guild_cog)
-        self.add_cog(NyxHelp(self))
+        # self.add_cog(NyxHelp(self))
         self.user_cog = NyxUser(self)
         self.add_cog(self.user_cog)
 
@@ -111,6 +111,7 @@ class Nyx(Bot):
         this dict, but it'll be kept here for now.
         """
         lower_name = type(cog).__name__.lower()
+        print(lower_name)
         if lower_name in self.lower_cogs:
             raise ClientException(
                 "The cog {} is already registered.".format(lower_name))
@@ -398,8 +399,9 @@ class Nyx(Bot):
                             self.all_commands[name] = cmd
         # print("{} removed".format(command))
 
-        # Preserve old code for now...
-        if True:
+        # TODO: Preserve old code for now...
+        a = True
+        if a:
             return command
 
         # Remove command from namespace if it is found.

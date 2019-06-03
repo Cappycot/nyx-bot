@@ -12,7 +12,7 @@ Notes:
 import re
 
 from discord.ext import commands
-from discord.ext.commands import HelpFormatter
+from discord.ext.commands import HelpCommand
 from discord.ext.commands.errors import CommandError
 
 from nyx.nyxcommands import is_module_exclusive
@@ -122,7 +122,7 @@ def max_namespace_size(cog_name, namespace, show_hidden):
     return max_name
 
 
-class NyxHelpFormatter(HelpFormatter):
+class NyxHelpCommand(HelpCommand):
     """Tweaked default HelpFormatter for how Nyx's command system works."""
 
     @property
@@ -170,7 +170,7 @@ class NyxHelpFormatter(HelpFormatter):
             shortened = self.shorten(entry)
             self._paginator.add_line(shortened)
 
-    async def filter_command_list(self):
+    async def filter_commands(self, commands, *, sort=False, key=None):  # TODO: figure out
         """Returns a filtered list of commands based on the two attributes
         provided, :attr:`show_check_failure` and :attr:`show_hidden`.
         Also filters based on if :meth:`~.HelpFormatter.is_cog` is valid.
