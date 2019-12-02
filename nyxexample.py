@@ -11,7 +11,7 @@ nyx_cog_folder = "cogs"  # The folder where cogs will be searched for.
 nyx_config_file = "info.nyx"  # The name of the config file used.
 
 nyx = Nyx()
-nyx.load_cogs(nyx_cog_folder)  # Get cogs from specified folder.
+# nyx.load_cogs(nyx_cog_folder)  # Get cogs from specified folder.
 
 nyx_config = ConfigParser()
 nyx_config.read(nyx_config_file)

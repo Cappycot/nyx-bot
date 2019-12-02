@@ -15,8 +15,6 @@ from discord.ext import commands
 from discord.ext.commands import HelpCommand
 from discord.ext.commands.errors import CommandError
 
-from nyx.nyxcommands import is_module_exclusive
-
 _mentions_transforms = {
     '@everyone': '@\u200beveryone',
     '@here': '@\u200bhere'
@@ -113,12 +111,8 @@ def max_namespace_size(cog_name, namespace, show_hidden):
         elif command.hidden and not show_hidden:
             continue
         # print("{}: {}".format(command_name, type(command).__name__))
-        if is_module_exclusive(command):
-            # print(len(command_name) + len(cog_name) + 1)
-            max_name = max(len(command_name) + len(cog_name) + 1, max_name)
-        else:
-            # print(len(command_name))
-            max_name = max(len(command_name), max_name)
+        # print(len(command_name))
+        max_name = max(len(command_name), max_name)
     return max_name
 
 
@@ -160,8 +154,6 @@ class NyxHelpCommand(HelpCommand):
                 # skip aliases
                 continue
             # need_module = isinstance(command, ModuleExclusiveCommand)
-            if is_module_exclusive(command):
-                name = "{} {}".format(command.cog_name.lower(), name)
             if len(command.short_doc) > 0:
                 entry = '  {0:<{width}} - {1}'.format(name, command.short_doc,
                                                       width=max_width)
