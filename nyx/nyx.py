@@ -259,3 +259,37 @@ class Nyx(Bot):
 
     async def invoke(self, ctx):
         await super().invoke(ctx)
+
+    # TODO: Refactor
+    def get_guild_data(self, discord_guild):
+        """Retrieves the GuildData object for a particular Discord Guild. If
+        such GuildData does not exist, then create a new object to hold
+        data. This is guaranteed to never return None unless None is passed
+        as an argument.
+        """
+        if discord_guild is None:
+            return None
+        # Since both Discord Guild and GuildData have a integer id
+        # parameter, this will still be okay if GuildData is passed.
+        # Quack quack.
+        if discord_guild.id not in self.guild_data:
+            guild = GuildData(discord_guild.id)
+            self.guild_data[discord_guild.id] = guild
+            return guild
+        else:
+            return self.guild_data[discord_guild.id]
+
+    def get_user_data(self, discord_user):
+        """Retrieves the UserData object for a particular Discord User. If such
+        UserData does not exist, then create a new object to hold data. This is
+        guaranteed to never return None unless None is passed as an argument.
+        """
+        if discord_user is None:
+            return None
+        # Quack quack.
+        if discord_user.id not in self.user_data:
+            user = UserData(discord_user.id)
+            self.user_data[discord_user.id] = user
+        else:
+            user = self.user_data[discord_user.id]
+        return user
