@@ -109,7 +109,7 @@ class Nyx(Bot):
         # Set the cog that is being referenced when removing a command
         # or the entire cog itself.
         self._ejecting_cog = None
-        super(Nyx, self).__init__(command_prefix=command_prefix, **options)
+        super(Nyx, self).__init__(command_prefix, **options)
 
     def get_disambiguation(self, name, create=False):
         """Get the dict of cogs that have a command with such a name. This is
@@ -236,7 +236,7 @@ class Nyx(Bot):
     # def reload_extension
 
     async def get_context(self, message, *args, cls=Context):
-        return super().get_context(message, *args, cls=Context)
+        return await super().get_context(message, *args, cls=Context)
 
     async def invoke(self, ctx):
-        super().invoke(ctx)
+        await super().invoke(ctx)
