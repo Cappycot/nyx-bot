@@ -158,6 +158,25 @@ class Nyx(Bot):
         self.lower_cogs.pop(name.lower(), None)
         self._ejecting_cog = None
 
+    # TODO: Modify if needed.
+    def load_cogs(self, folder=None):
+        """Load extensions from a certain folder. This will add the folder to
+        the sys path so we can just load extensions by the python file name.
+        """
+        if folder is not None:
+            self.cogs_folder = folder
+        if self.cogs_folder is None:
+            return False
+        path = getcwd() + "/" + self.cogs_folder + "/"
+        print(path)
+        sys.path.append(path)
+        for mod_path in listdir(path):
+            if not isfile(path + mod_path):
+                continue
+            if mod_path.endswith(".py"):
+                self.load_extension(mod_path[:-3])
+        return True
+
     def add_command(self, command):
         # Raise the usual errors from super method.
         if not isinstance(command, Command):
