@@ -293,3 +293,9 @@ class Nyx(Bot):
         else:
             user = self.user_data[discord_user.id]
         return user
+
+    async def reply(self, ctx, content):
+        if ctx.message.guild is None:
+            await ctx.send(content)
+        else:
+            await ctx.send(ctx.message.author.mention + ", " + content)
