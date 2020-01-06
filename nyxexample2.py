@@ -5,14 +5,14 @@ The name of the folder where cogs are stored can be specified here as well.
 """
 
 from configparser import ConfigParser
-from nyx import Nyx
+from nyx import NyxBot
 from discord.ext import commands
 from discord.ext.commands import Cog
 
 nyx_cog_folder = "cogs"  # The folder where cogs will be searched for.
 nyx_config_file = "info.nyx"  # The name of the config file used.
 
-nyx = Nyx()
+nyx = NyxBot()
 
 
 # nyx.load_cogs(nyx_cog_folder)  # Get cogs from specified folder.
