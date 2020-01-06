@@ -12,8 +12,19 @@ Notes:
 import re
 
 from discord.ext import commands
-from discord.ext.commands import HelpCommand
+from discord.ext.commands import HelpCommand, DefaultHelpCommand
 from discord.ext.commands.errors import CommandError
+
+
+class DefaultNyxHelpCommand(DefaultHelpCommand):
+
+    def get_bot_mapping(self):
+        mapping = super().get_bot_mapping()
+        namespace_none = self.context.bot.namespace.get_namespace(None)
+        if namespace_none is not None:
+            mapping[None] = [a for a in namespace_none.values()]
+        return mapping
+
 
 _mentions_transforms = {
     '@everyone': '@\u200beveryone',
@@ -116,7 +127,7 @@ def max_namespace_size(cog_name, namespace, show_hidden):
     return max_name
 
 
-class NyxHelpCommand(HelpCommand):
+class OldNyxHelpCommand(HelpCommand):
     """Tweaked default HelpFormatter for how Nyx's command system works."""
 
     @property
@@ -162,7 +173,8 @@ class NyxHelpCommand(HelpCommand):
             shortened = self.shorten(entry)
             self._paginator.add_line(shortened)
 
-    async def filter_commands(self, commands, *, sort=False, key=None):  # TODO: figure out
+    async def filter_commands(self, commands, *, sort=False,
+                              key=None):  # TODO: figure out
         """Returns a filtered list of commands based on the two attributes
         provided, :attr:`show_check_failure` and :attr:`show_hidden`.
         Also filters based on if :meth:`~.HelpFormatter.is_cog` is valid.

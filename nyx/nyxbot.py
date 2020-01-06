@@ -17,23 +17,16 @@ Future Tasks:
 """
 
 import sys
-from contextlib import closing, redirect_stdout
-from inspect import getmembers
-from io import StringIO
 from os import getcwd, listdir
-from os.path import exists, isfile
+from os.path import isfile
 
 from discord import ClientException
-from discord.ext.commands import Bot, Cog, Command, CommandError, \
-    CommandNotFound, Context, GroupMixin
-from discord.ext.commands.bot import _is_submodule  # lol
-from discord.ext.commands.view import StringView
+from discord.ext.commands import Bot, Cog, Command, CommandError, Context
 
-from nyx import NyxDisambiguation, NyxNamespace
+from nyx.nyxdisambiguation import NyxDisambiguation
+from nyx.nyxnamespace import NyxNamespace
 from nyx.nyxdata import GuildData, UserData
-from nyx.nyxguild import NyxGuild
-# from nyx.nyxhelp import NyxHelp, NyxHelpCommand  # TODO: Work on specialized HelpCommand
-from nyx.nyxuser import NyxUser
+from nyx.nyxhelp import DefaultNyxHelpCommand
 
 
 class CommandHasDisambiguation(CommandError):
@@ -66,7 +59,8 @@ class NyxBot(Bot):
     between two commands from differing cogs with the same name if needed.
     """
 
-    def __init__(self, command_prefix=check_prefix, default_cog="nyx",
+    def __init__(self, command_prefix=check_prefix, default_cog_name="nyx",
+                 help_command=DefaultNyxHelpCommand(),
                  **options):
         self.cogs_folder = None
         # Used to group commands by module name for easy collision resolution.
@@ -85,13 +79,13 @@ class NyxBot(Bot):
 
         # The disambiguation table is used to look up commands of the same
         # name, distinguished by the object id.
-        self.disambiguation = NyxDisambiguation(default_cog=default_cog)
+        self.disambiguation = NyxDisambiguation()
 
         # Additional restriction to make cog commands not case-sensitive.
         self.lower_cogs = {}  # {cog name:cog} with lowercase cog names
 
         # The namespaces table is used to look up commands by the cog name.
-        self.namespace = NyxNamespace()
+        self.namespace = NyxNamespace(default_cog_name=default_cog_name)
 
         self.debug = False
         # Default command prefixes that can be overwritten...
@@ -109,7 +103,17 @@ class NyxBot(Bot):
         # Set the cog that is being referenced when removing a command
         # or the entire cog itself.
         self._ejecting_cog = None
-        super(NyxBot, self).__init__(command_prefix, **options)
+        super(NyxBot, self).__init__(command_prefix, help_command=help_command,
+                                     **options)
+
+    @property
+    def commands(self):
+        ret = []
+        # TODO: Review "self.disambiguation.disambiguations.values()"
+        for command_name in self.disambiguation.disambiguations.values():
+            for cmd in command_name.values():
+                ret.append(cmd)
+        return set(ret)
 
     def add_cog(self, cog):
         if not isinstance(cog, Cog):
