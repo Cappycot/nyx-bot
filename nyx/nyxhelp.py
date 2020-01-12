@@ -20,7 +20,7 @@ class DefaultNyxHelpCommand(DefaultHelpCommand):
 
     def get_bot_mapping(self):
         mapping = super().get_bot_mapping()
-        namespace_none = self.context.bot.namespace.get_namespace(None)
+        namespace_none = self.context.bot.get_namespace(None)
         if namespace_none is not None:
             mapping[None] = [a for a in namespace_none.values()]
         return mapping

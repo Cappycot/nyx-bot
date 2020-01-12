@@ -21,12 +21,12 @@ from os import getcwd, listdir
 from os.path import isfile
 
 from discord import ClientException
-from discord.ext.commands import Bot, Cog, Command, CommandError, Context
+from discord.ext.commands import Bot, Cog, Command, CommandError, \
+    CommandNotFound, Context
+from discord.ext.commands.view import StringView
 
-from nyx.nyxdisambiguation import NyxDisambiguation
-from nyx.nyxnamespace import NyxNamespace
-from nyx.nyxdata import GuildData, UserData
-from nyx.nyxhelp import DefaultNyxHelpCommand
+from nyx import DefaultNyxHelpCommand
+from nyx.nyxbase import NyxBase
 
 
 class CommandHasDisambiguation(CommandError):
@@ -54,7 +54,7 @@ def check_prefix(bot, message):
     return prefixes
 
 
-class NyxBot(Bot):
+class NyxBot(NyxBase, Bot):
     """An extension of the discord.py Bot class that can handle a collision
     between two commands from differing cogs with the same name if needed.
     """
@@ -77,15 +77,8 @@ class NyxBot(Bot):
 
         # self.core_commands = {}  # I don't think we'll be using this.
 
-        # The disambiguation table is used to look up commands of the same
-        # name, distinguished by the object id.
-        self.disambiguation = NyxDisambiguation()
-
         # Additional restriction to make cog commands not case-sensitive.
         self.lower_cogs = {}  # {cog name:cog} with lowercase cog names
-
-        # The namespaces table is used to look up commands by the cog name.
-        self.namespace = NyxNamespace(default_cog_name=default_cog_name)
 
         self.debug = False
         # Default command prefixes that can be overwritten...
@@ -94,25 +87,19 @@ class NyxBot(Bot):
         self.prefixes = ["$", "~", "!", "%", "^", "&", "*", "-", "=", ",", ".",
                          ">", "/", "?"]
         # self.separate = False
-        self.guild_cog = None
-        self.guild_data = {}
-        self.guilds_folder = None
-        self.user_cog = None
-        self.user_data = {}
-        self.users_folder = None
+
         # Set the cog that is being referenced when removing a command
         # or the entire cog itself.
         self._ejecting_cog = None
-        super(NyxBot, self).__init__(command_prefix, help_command=help_command,
-                                     **options)
+        NyxBase.__init__(self, default_cog_name)
+        Bot.__init__(self, command_prefix, help_command=help_command,
+                     **options)
 
     @property
     def commands(self):
         ret = []
-        # TODO: Review "self.disambiguation.disambiguations.values()"
-        for command_name in self.disambiguation.disambiguations.values():
-            for cmd in command_name.values():
-                ret.append(cmd)
+        for command_name in self.disambiguations.values():
+            ret.extend(command_name.values())
         return set(ret)
 
     def add_cog(self, cog):
@@ -174,8 +161,7 @@ class NyxBot(Bot):
             else:
                 self.all_commands[alias] = command
 
-        self.disambiguation.add_command(command)
-        self.namespace.add_command(command)
+        self.add_command_entry(command)
 
     def remove_command(self, command_name):
         command = super().remove_command(command_name)
@@ -194,13 +180,13 @@ class NyxBot(Bot):
                     break
             if command is None:
                 return None
-            self.disambiguation.remove_command(command_name, command)
-            self.namespace.remove_command(command_name, command.cog_name)
+            self.remove_disambiguation_command(command_name, command)
+            self.remove_namespace_command(command_name, command.cog_name)
             if command_name not in command.aliases:
                 for alias in command.aliases:
                     self.all_commands.pop(alias, None)
-                    self.disambiguation.remove_command(alias, command)
-                    self.namespace.remove_command(alias, command.cog_name)
+                    self.remove_disambiguation_command(alias, command)
+                    self.remove_namespace_command(alias, command.cog_name)
 
         return command
 
@@ -212,44 +198,64 @@ class NyxBot(Bot):
     # def reload_extension
 
     async def get_context(self, message, *args, cls=Context):
-        return await super().get_context(message, *args, cls=Context)
+        """Override latter part of context in case we actually run into
+        a disambiguation.
+        """
+        ctx = await super().get_context(message, *args, cls=Context)
+        # Make sure the current command is not part of a disambiguation with
+        # multiple commands.
+        if ctx.command is not None:
+            disambiguation = self.get_disambiguation(ctx.invoked_with)
+            if disambiguation is not None and len(disambiguation) > 1:
+                ctx.command = None
+
+        # If no command was found or a disambiguation occurred...
+        if ctx.command is None and ctx.prefix is not None:
+            # Attempt to grab command
+            view = StringView(message.content)
+            ctx.view = view
+            view.skip_string(ctx.prefix)
+
+            invoker = view.get_word().lower()
+            ctx.invoked_with = invoker
+
+            disambiguation = self.get_disambiguation(invoker)
+            namespace = self.get_namespace(invoker)
+
+            if namespace is not None:
+                view.skip_ws()
+                # We'll need to affix the namespace name to the prefix if we
+                # get a working command to invoke.
+                namespace_name = invoker
+                invoker = view.get_word().lower()
+                if invoker:
+                    ctx.command = namespace.get(invoker)
+                    ctx.invoked_with = invoker
+                    ctx.prefix += namespace_name + " "
+            elif disambiguation is not None:
+                if len(disambiguation) == 1:
+                    ctx.command = list(disambiguation.values())[0]
+                elif len(disambiguation) > 1 and ctx.guild is not None:
+                    ctx.command = self.get_guild_data(
+                        ctx.guild).command_map.get(ctx.invoked_with)
+
+        return ctx
 
     async def invoke(self, ctx):
-        await super().invoke(ctx)
-
-    # TODO: Refactor
-    def get_guild_data(self, discord_guild):
-        """Retrieves the GuildData object for a particular Discord Guild. If
-        such GuildData does not exist, then create a new object to hold
-        data. This is guaranteed to never return None unless None is passed
-        as an argument.
+        """Hook into this function for sending command errors for
+        disambiguations.
         """
-        if discord_guild is None:
-            return None
-        # Since both Discord Guild and GuildData have a integer id
-        # parameter, this will still be okay if GuildData is passed.
-        # Quack quack.
-        if discord_guild.id not in self.guild_data:
-            guild = GuildData(discord_guild.id)
-            self.guild_data[discord_guild.id] = guild
-            return guild
-        else:
-            return self.guild_data[discord_guild.id]
-
-    def get_user_data(self, discord_user):
-        """Retrieves the UserData object for a particular Discord User. If such
-        UserData does not exist, then create a new object to hold data. This is
-        guaranteed to never return None unless None is passed as an argument.
-        """
-        if discord_user is None:
-            return None
-        # Quack quack.
-        if discord_user.id not in self.user_data:
-            user = UserData(discord_user.id)
-            self.user_data[discord_user.id] = user
-        else:
-            user = self.user_data[discord_user.id]
-        return user
+        if ctx.command is not None:
+            await super().invoke(ctx)
+        elif ctx.invoked_with:
+            if self.get_disambiguation(ctx.invoked_with) is None:
+                exc = CommandNotFound(
+                    'Command "{}" is not found'.format(ctx.invoked_with))
+            else:
+                exc = CommandHasDisambiguation(
+                    'Command "{}" exists in multiple cogs'.format(
+                        ctx.invoked_with))
+            self.dispatch("command_error", ctx, exc)
 
     async def reply(self, ctx, content):
         if ctx.message.guild is None:
