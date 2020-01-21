@@ -6,8 +6,6 @@ https://discordapp.com/oauth2/authorize?client_id=
 
 https://drive.google.com/open?id=0B94jrO7TTwmORFlpeTJ1Z09UVEU
 
-clear; python3 nyx.py &
-
 Future Tasks:
  - Rewrite task scheduling? (Clocks)
  - Add "dirty" boolean to Guild/UserData for write back optimization.
@@ -22,11 +20,11 @@ from os.path import isfile
 
 from discord import ClientException
 from discord.ext.commands import Bot, Cog, Command, CommandError, \
-    CommandNotFound, Context
+    CommandNotFound, Context, GroupMixin
 from discord.ext.commands.view import StringView
 
-from nyx import DefaultNyxHelpCommand
 from nyx.nyxbase import NyxBase
+from nyx.nyxhelp import DefaultNyxHelpCommand
 
 
 class CommandHasDisambiguation(CommandError):
@@ -195,7 +193,13 @@ class NyxBot(NyxBase, Bot):
         self.remove_command(name)
         self._ejecting_cog = None
 
-    # def reload_extension
+    def walk_commands(self):
+        """Uses disambiguations instead of all_commands."""
+        for disambiguation in tuple(self.disambiguations.values()):
+            for command in tuple(disambiguation.values()):
+                yield command
+                if isinstance(command, GroupMixin):
+                    yield from command.walk_commands()
 
     async def get_context(self, message, *args, cls=Context):
         """Override latter part of context in case we actually run into
@@ -237,7 +241,7 @@ class NyxBot(NyxBase, Bot):
                     ctx.command = list(disambiguation.values())[0]
                 elif len(disambiguation) > 1 and ctx.guild is not None:
                     ctx.command = self.get_guild_data(
-                        ctx.guild).command_map.get(ctx.invoked_with)
+                        ctx.guild).command_map.get(invoker)
 
         return ctx
 
@@ -256,9 +260,3 @@ class NyxBot(NyxBase, Bot):
                     'Command "{}" exists in multiple cogs'.format(
                         ctx.invoked_with))
             self.dispatch("command_error", ctx, exc)
-
-    async def reply(self, ctx, content):
-        if ctx.message.guild is None:
-            await ctx.send(content)
-        else:
-            await ctx.send(ctx.message.author.mention + ", " + content)
