@@ -97,6 +97,7 @@ cogs/
 # Nyx Data
 *.nyx
 cogs/
+data/
 guilds/
 users/
 music/
