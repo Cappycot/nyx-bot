@@ -9,7 +9,7 @@ from discord.ext.commands import Cog
 
 import nyx.nyxcommands as nyxcommands
 from nyx.nyxdata import GuildData
-from nyx.nyxutils import list_string, respond
+from nyx.nyxutils import list_string, reply
 
 default_folder = "guilds"
 is_manager = nyxcommands.has_privilege_or_permissions(privilege=-1,
@@ -149,7 +149,7 @@ class NyxGuild(Cog):
                                                 "find them..."]))
         else:
             self.save_guild_data(guild_data.id)
-            await respond(ctx, "Added module(s) " + list_string(changed))
+            await reply(ctx, "Added module(s) " + list_string(changed))
 
     @module.command(name="list")
     @commands.guild_only()
@@ -177,7 +177,7 @@ class NyxGuild(Cog):
                 ["I couldn't find such a", "module to remove."]))
         else:
             self.save_guild_data(guild_data.id)
-            await respond(ctx, "Removed module(s) " + list_string(changed))
+            await reply(ctx, "Removed module(s) " + list_string(changed))
 
     @commands.command(aliases=["prefixes"])
     @commands.guild_only()
@@ -192,10 +192,8 @@ class NyxGuild(Cog):
         if add or remove:
             if is_manager(ctx):
                 if len(prefixes) == 0:
-                    await self.nyx.reply(ctx,
-                                         "You didn't tell me what prefixes " +
-                                         "to " + (
-                                             "add!" if add else "remove!"))
+                    await reply(ctx, "You didn't tell me what prefixes to " +
+                                ("add!" if add else "remove!"))
                     return
                 changed = []
                 for prefix in prefixes:
@@ -207,25 +205,24 @@ class NyxGuild(Cog):
                         changed.append(prefix)
                 if len(changed) == 0:
                     if add:
-                        await self.nyx.reply(ctx, "The prefixes were already" +
-                                             " added.")
+                        await reply(ctx, "The prefixes were already added.")
                     else:
-                        await self.nyx.reply(ctx, "I couldn't find such a " +
-                                             "prefix to remove.")
+                        await reply(ctx, "I couldn't find such a " +
+                                    "prefix to remove.")
                 else:
                     self.save_guild_data(guild_data.id)
                     result = ("Added" if add else "Removed") + " prefix(es) "
                     result += list_string(changed, key=lambda a: "'" + a + "'")
-                    await self.nyx.reply(ctx, result)
+                    await reply(ctx, result)
             else:
-                await self.nyx.reply(ctx, "You don't have permission to " +
-                                     "change this guild's prefixes.")
+                await reply(ctx, "You don't have permission to change this " +
+                            "guild's prefixes.")
         elif len(guild_data.prefixes) == 0:
-            await self.nyx.reply(ctx, "This guild has no set prefixes...")
+            await reply(ctx, "This guild has no set prefixes...")
         else:
             plural = len(guild_data.prefixes) > 1
             result = list_string(guild_data.prefixes,
                                  key=lambda a: "'" + a + "'")
-            await self.nyx.reply(ctx, "Prefix" + (
-                "es" if plural else "") + " for this server " +
-                                 ("are " if plural else "is ") + result)
+            await reply(ctx, "Prefix" + ("es" if plural else "") +
+                        " for this server " + (
+                            "are " if plural else "is ") + result)
