@@ -9,13 +9,9 @@ Notes:
  - Command signature is in the format [name|alias] <param> [param]
 """
 
-import re
-
-from discord.ext import commands
-from discord.ext.commands import Group, HelpCommand, DefaultHelpCommand, \
-    MinimalHelpCommand
-from discord.ext.commands.errors import CommandError
+from discord.ext.commands import Group, DefaultHelpCommand, MinimalHelpCommand
 from discord.ext.commands.view import StringView
+from discord.utils import maybe_coroutine
 
 
 class DefaultNyxHelpCommand(DefaultHelpCommand):
@@ -61,12 +57,28 @@ class DefaultNyxHelpCommand(DefaultHelpCommand):
                     self.context.guild).command_map.get(invoker)
 
         if command is not None:
-            # TODO: Perform search for subcommands.
+            keys = self._ref_command.split(" ")
+            for key in keys[1:]:
+                try:
+                    found = command.all_commands.get(key)
+                except AttributeError:
+                    string = await maybe_coroutine(self.subcommand_not_found,
+                                                   command,
+                                                   self.remove_mentions(key))
+                    return await self.send_error_message(string)
+                else:
+                    if found is None:
+                        string = await maybe_coroutine(
+                            self.subcommand_not_found, command,
+                            self.remove_mentions(key))
+                        return await self.send_error_message(string)
+                    command = found
             if isinstance(command, Group):
                 await self.send_group_help(command)
             else:
                 await self.send_command_help(command)
             return None
+
         return super().command_not_found(string)
 
     async def send_error_message(self, error):
