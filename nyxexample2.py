@@ -5,15 +5,34 @@ The name of the folder where cogs are stored can be specified here as well.
 """
 
 from configparser import ConfigParser
-from nyx import NyxBot, NyxGuild, NyxUser
+from nyx import NyxBot
+from discord.ext import commands
+from discord.ext.commands import Cog
 
 nyx_cog_folder = "cogs"  # The folder where cogs will be searched for.
 nyx_config_file = "info.nyx"  # The name of the config file used.
 
 nyx = NyxBot()
-nyx.add_cog(NyxGuild(nyx))
-nyx.add_cog(NyxUser(nyx))
-nyx.load_cogs(nyx_cog_folder)  # Get cogs from specified folder.
+
+
+# nyx.load_cogs(nyx_cog_folder)  # Get cogs from specified folder.
+
+
+class TestOne(Cog):
+
+    @commands.command()
+    async def asdf(self, ctx):
+        print("asdf")
+        return "asdf"
+
+
+class TestTwo(Cog):
+
+    @commands.command()
+    async def asdf(self, ctx):
+        print("fdsa")
+        return "fdsa"
+
 
 nyx_config = ConfigParser()
 nyx_config.read(nyx_config_file)
@@ -25,4 +44,6 @@ elif "Token" not in nyx_config["Settings"]:
     print("Token setting not found. Configure your " +
           nyx_config_file + " file.")
 else:
+    nyx.add_cog(TestOne())
+    nyx.add_cog(TestTwo())
     nyx.run(nyx_config["Settings"]["Token"])
