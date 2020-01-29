@@ -40,10 +40,11 @@ def check_prefix(bot, message):
     """If a guild has no specified custom prefixes, Nyx will use her mention
     appended before each of her default prefixes.
     """
-    mention = bot.user.mention
+    # TODO: Confirm if mentions will always be in the format "<@!id>"
+    # Not sure if this changes in discord.py 1.3.0/1.3.1
+    mention = '<@!%s>' % bot.user.id  # bot.user.mention
     prefixes = []
     if message.guild is not None:
-        mention = message.guild.get_member(bot.user.id).mention
         prefixes.extend(bot.get_guild_data(message.guild).prefixes)
     else:
         prefixes.extend(bot.prefixes)
@@ -178,13 +179,13 @@ class NyxBot(NyxBase, Bot):
                     break
             if command is None:
                 return None
-            self.remove_disambiguation_command(command_name, command)
-            self.remove_namespace_command(command_name, command.cog_name)
-            if command_name not in command.aliases:
-                for alias in command.aliases:
-                    self.all_commands.pop(alias, None)
-                    self.remove_disambiguation_command(alias, command)
-                    self.remove_namespace_command(alias, command.cog_name)
+        self.remove_disambiguation_command(command_name, command)
+        self.remove_namespace_command(command_name, command.cog_name)
+        if command_name not in command.aliases:
+            for alias in command.aliases:
+                self.all_commands.pop(alias, None)
+                self.remove_disambiguation_command(alias, command)
+                self.remove_namespace_command(alias, command.cog_name)
 
         return command
 
