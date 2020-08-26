@@ -15,8 +15,8 @@ Future Tasks:
 """
 
 import sys
-from os import getcwd, listdir
-from os.path import isfile
+from os import getcwd, listdir, makedirs
+from os.path import exists, isfile, join
 
 from discord import ClientException
 from discord.ext.commands import Bot, Cog, Command, CommandError, \
@@ -129,11 +129,17 @@ class NyxBot(NyxBase, Bot):
             self.cogs_folder = folder
         if self.cogs_folder is None:
             return False
-        path = getcwd() + "/" + self.cogs_folder + "/"
+        # path = getcwd() + "/" + self.cogs_folder + "/"
+        path = join(getcwd(), self.cogs_folder)
         print(path)
+        if not exists(path):
+            makedirs(path)
+        elif isfile(path):
+            return False
         sys.path.append(path)
         for mod_path in listdir(path):
-            if not isfile(path + mod_path):
+            # if not isfile(path + mod_path):
+            if not isfile(join(path, mod_path)):
                 continue
             if mod_path.endswith(".py"):
                 self.load_extension(mod_path[:-3])
