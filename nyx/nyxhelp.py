@@ -39,6 +39,7 @@ class DefaultNyxHelpCommand(DefaultHelpCommand):
         command = None
         disambiguation = bot.get_disambiguation(invoker)
         namespace = bot.get_namespace(invoker)
+        namespaced = False
 
         if namespace is not None:
             view.skip_ws()
@@ -48,6 +49,7 @@ class DefaultNyxHelpCommand(DefaultHelpCommand):
             invoker = view.get_word().lower()
             if invoker:
                 command = namespace.get(invoker)
+                namespaced = True
                 self.context.prefix += namespace_name + " "
         elif disambiguation is not None:
             if len(disambiguation) == 1:
@@ -56,9 +58,13 @@ class DefaultNyxHelpCommand(DefaultHelpCommand):
                 command = bot.get_guild_data(
                     self.context.guild).command_map.get(invoker)
 
-        if command is not None:
-            keys = self._ref_command.split(" ")
-            for key in keys[1:]:
+        if command is None:
+            pass  # TODO: Create ambiguity help page.
+        else:
+            keys = self._ref_command.split(" ")[2 if namespaced else 1:]
+            # print(keys)
+            # for key in keys[1:]:
+            for key in keys:
                 try:
                     found = command.all_commands.get(key)
                 except AttributeError:
