@@ -7,9 +7,9 @@ from os.path import isfile, join, exists
 from discord.ext import commands
 from discord.ext.commands import Cog
 
-import nyx.nyxcommands as nyxcommands
-from nyx.nyxdata import GuildData
-from nyx.nyxutils import list_string, reply
+import nyxbot.nyxcommands as nyxcommands
+from nyxbot.nyxdata import GuildData
+from nyxbot.nyxutils import list_string, reply
 
 default_folder = "guilds"
 is_manager = nyxcommands.has_privilege_or_permissions(privilege=-1,

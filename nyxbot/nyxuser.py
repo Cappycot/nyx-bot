@@ -6,7 +6,7 @@ from os.path import isfile, join, exists
 
 # from discord.ext import commands
 from discord.ext.commands import Cog
-from nyx.nyxdata import UserData
+from nyxbot.nyxdata import UserData
 
 default_folder = "users"
 

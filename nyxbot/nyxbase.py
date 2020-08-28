@@ -1,4 +1,4 @@
-from nyx.nyxdata import GuildData, UserData
+from nyxbot.nyxdata import GuildData, UserData
 
 
 class NyxBase:

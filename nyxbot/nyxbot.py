@@ -23,8 +23,8 @@ from discord.ext.commands import Bot, Cog, Command, CommandError, \
     CommandNotFound, Context, GroupMixin
 from discord.ext.commands.view import StringView
 
-from nyx.nyxbase import NyxBase
-from nyx.nyxhelp import DefaultNyxHelpCommand
+from nyxbot.nyxbase import NyxBase
+from nyxbot.nyxhelp import DefaultNyxHelpCommand
 
 
 class CommandHasDisambiguation(CommandError):
