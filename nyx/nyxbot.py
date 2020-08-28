@@ -150,48 +150,69 @@ class NyxBot(NyxBase, Bot):
         if not isinstance(command, Command):
             raise TypeError('The command passed must be a subclass of Command')
 
-        # Attempt to add command name to all commands dictionary.
+        # Attempt to add command name to all_commands dictionary.
         name = command.name.lower()
-        if name in self.all_commands and not self.all_commands[name].hidden:
-            del self.all_commands[name]
-        else:
-            self.all_commands[name] = command
+        disambiguation = self.get_disambiguation(name, create=True)
+        if len(disambiguation) < 2:
+            if name in self.all_commands:
+                # and not self.all_commands[name].hidden:
+                del self.all_commands[name]
+            else:
+                self.all_commands[name] = command
 
-        # Attempt to add command aliases to all commands dictionary.
+        # Attempt to add command aliases to all_commands dictionary.
         for alias in command.aliases:
             alias = alias.lower()
-            if alias in self.all_commands:
-                # and not self.all_commands[alias].hidden:
-                del self.all_commands[alias]
-            else:
-                self.all_commands[alias] = command
+            disambiguation = self.get_disambiguation(alias, create=True)
+            if len(disambiguation) < 2:
+                if alias in self.all_commands:
+                    # and not self.all_commands[alias].hidden:
+                    del self.all_commands[alias]
+                else:
+                    self.all_commands[alias] = command
 
         self.add_command_entry(command)
 
     def remove_command(self, command_name):
+        """Run the vanilla procedure for removing a command from the default
+        all_commands list, then remove the command from the additional
+        dictionaries.
+        """
         command = super().remove_command(command_name)
         # We either need the command or the name and the cog.
         if command is None and self._ejecting_cog is None:
             # raise ClientException(
             # "No cog to remove the {} command from.".format(name))
             return None
-
         # Remove aliases from all_commands if original DNE
         # Get the command from the cog in question.
-        if command is None:
+        elif command is None:
             for c in self._ejecting_cog.get_commands():
                 if c.name == command_name:
                     command = c
                     break
             if command is None:
                 return None
+
         self.remove_disambiguation_command(command_name, command)
         self.remove_namespace_command(command_name, command.cog_name)
+        # Restore entry in all_commands if there is no more ambiguity.
+        disambiguation = self.get_disambiguation(command_name)
+        if disambiguation is not None and len(disambiguation) == 1:
+            self.all_commands[command_name.lower()] = list(
+                disambiguation.values())[0]
+
+        # Pop aliases.
         if command_name not in command.aliases:
             for alias in command.aliases:
                 self.all_commands.pop(alias, None)
                 self.remove_disambiguation_command(alias, command)
                 self.remove_namespace_command(alias, command.cog_name)
+                # Restore alias in all_commands if there is no more ambiguity.
+                disambiguation = self.get_disambiguation(alias)
+                if disambiguation is not None and len(disambiguation) == 1:
+                    self.all_commands[alias.lower()] = list(
+                        disambiguation.values())[0]
 
         return command
 
