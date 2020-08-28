@@ -33,7 +33,9 @@ class CommandHasDisambiguation(CommandError):
 
     This does not apply to subcommands.
     """
-    pass
+
+    def __init__(self, message=None, *args):
+        super().__init__(message, *args)
 
 
 def check_prefix(bot, message):
@@ -145,11 +147,31 @@ class NyxBot(NyxBase, Bot):
                 self.load_extension(mod_path[:-3])
         return True
 
+    def _add_command(self, command, name):
+        disambiguation = self.get_disambiguation(name)
+        # if len(disambiguation) < 2:
+        # if name in self.all_commands:
+        # del self.all_commands[name]
+        # else:
+        # self.all_commands[name] = command
+        if disambiguation is None or len(disambiguation) == 0:
+            self.all_commands[name] = command
+        elif name in self.all_commands:
+            del self.all_commands[name]
+
     def add_command(self, command):
         # Raise the usual errors from super method.
         if not isinstance(command, Command):
             raise TypeError('The command passed must be a subclass of Command')
 
+        # Attempt to add command name to all_commands dictionary.
+        self._add_command(command, command.name.lower())
+
+        # Attempt to add command aliases to all_commands dictionary.
+        for alias in command.aliases:
+            self._add_command(command, alias.lower())
+
+        """
         # Attempt to add command name to all_commands dictionary.
         name = command.name.lower()
         disambiguation = self.get_disambiguation(name, create=True)
@@ -170,14 +192,23 @@ class NyxBot(NyxBase, Bot):
                     del self.all_commands[alias]
                 else:
                     self.all_commands[alias] = command
-
+        """
         self.add_command_entry(command)
+
+    def _remove_command(self, command, command_name):
+        self.remove_disambiguation_command(command_name, command)
+        self.remove_namespace_command(command_name, command.cog_name)
+        # Restore entry in all_commands if there is no more ambiguity.
+        disambiguation = self.get_disambiguation(command_name)
+        if disambiguation is not None and len(disambiguation) == 1:
+            self.all_commands[command_name] = list(disambiguation.values())[0]
 
     def remove_command(self, command_name):
         """Run the vanilla procedure for removing a command from the default
         all_commands list, then remove the command from the additional
         dictionaries.
         """
+        command_name = command_name.lower()
         command = super().remove_command(command_name)
         # We either need the command or the name and the cog.
         if command is None and self._ejecting_cog is None:
@@ -194,6 +225,7 @@ class NyxBot(NyxBase, Bot):
             if command is None:
                 return None
 
+        """
         self.remove_disambiguation_command(command_name, command)
         self.remove_namespace_command(command_name, command.cog_name)
         # Restore entry in all_commands if there is no more ambiguity.
@@ -201,11 +233,16 @@ class NyxBot(NyxBase, Bot):
         if disambiguation is not None and len(disambiguation) == 1:
             self.all_commands[command_name.lower()] = list(
                 disambiguation.values())[0]
+        """
+        self._remove_command(command, command_name)
 
         # Pop aliases.
         if command_name not in command.aliases:
             for alias in command.aliases:
+                alias = alias.lower()
                 self.all_commands.pop(alias, None)
+                self._remove_command(command, alias)
+                """
                 self.remove_disambiguation_command(alias, command)
                 self.remove_namespace_command(alias, command.cog_name)
                 # Restore alias in all_commands if there is no more ambiguity.
@@ -213,7 +250,7 @@ class NyxBot(NyxBase, Bot):
                 if disambiguation is not None and len(disambiguation) == 1:
                     self.all_commands[alias.lower()] = list(
                         disambiguation.values())[0]
-
+                """
         return command
 
     def remove_cog_command(self, name, cog):
@@ -280,10 +317,10 @@ class NyxBot(NyxBase, Bot):
         if ctx.command is not None:
             await super().invoke(ctx)
         elif ctx.invoked_with:
-            if self.get_disambiguation(ctx.invoked_with) is None:
-                exc = CommandNotFound(
-                    'Command "{}" is not found'.format(ctx.invoked_with))
-            else:
+            disambiguation = self.get_disambiguation(ctx.invoked_with)
+            exc = CommandNotFound(
+                'Command "{}" is not found'.format(ctx.invoked_with))
+            if disambiguation is not None and len(disambiguation) > 1:
                 exc = CommandHasDisambiguation(
                     'Command "{}" exists in multiple cogs'.format(
                         ctx.invoked_with))
