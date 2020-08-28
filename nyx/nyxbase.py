@@ -34,6 +34,8 @@ class NyxBase:
         """
         if name is not None:
             name = name.lower()
+            if name == "none":
+                name = None
         if create and name not in self.namespaces:
             self.namespaces[name] = {}
         return self.namespaces.get(name, None)
