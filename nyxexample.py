@@ -5,7 +5,7 @@ The name of the folder where cogs are stored can be specified here as well.
 """
 
 from configparser import ConfigParser
-from nyx import NyxBot, NyxGuild, NyxUser
+from nyxbot import NyxBot, NyxGuild, NyxUser
 
 nyx_cog_folder = "cogs"  # The folder where cogs will be searched for.
 nyx_config_file = "info.nyx"  # The name of the config file used.
