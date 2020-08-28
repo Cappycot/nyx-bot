@@ -1,4 +1,4 @@
-from .nyxbot import NyxBot
+from .nyxbot import NyxBot, CommandHasDisambiguation
 from .nyxcommands import *
 from .nyxguild import NyxGuild
 from .nyxhelp import DefaultNyxHelpCommand
