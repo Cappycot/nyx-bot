@@ -66,12 +66,10 @@ class DefaultNyxHelpCommand(DefaultHelpCommand):
     async def send_disambiguation_help(self, disambiguation, invoker,
                                        example=True):
         self.paginator.add_line(
-            ("The command \"{0}\" exists in multiple cogs. Type the " +
-             "module name followed by \"{0}\" to invoke it.").format(
-                invoker), empty=False)
+            "The command \"{0}\" exists in multiple cogs.".format(invoker),
+            empty=False)
         self.paginator.add_line(
-            ("The command \"{0}\" exists in multiple cogs. Type the " +
-             "module name followed by \"{0}\" to invoke it.").format(
+            "Type the module name followed by \"{0}\" to invoke it.".format(
                 invoker), empty=not example)
 
         def get_category(command, *,
