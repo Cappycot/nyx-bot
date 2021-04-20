@@ -34,8 +34,9 @@ class CommandHasDisambiguation(CommandError):
     This does not apply to subcommands.
     """
 
-    def __init__(self, message=None, *args):
+    def __init__(self, disambiguation, message=None, *args):
         super().__init__(message, *args)
+        self.disambiguation = disambiguation
 
 
 def check_prefix(bot, message):
@@ -107,7 +108,8 @@ class NyxBot(NyxBase, Bot):
         if not isinstance(cog, Cog):
             raise TypeError('cogs must derive from Cog')
         # Cogs now have a more official way to get their name.
-        lower_name = cog.__cog_name__.lower()
+        lower_name = cog.qualified_name.lower()
+        # lower_name = cog.__cog_name__.lower()
         # lower_name = type(cog).__name__.lower()
         # print(lower_name)
         if lower_name in self.lower_cogs:
@@ -266,11 +268,11 @@ class NyxBot(NyxBase, Bot):
                 if isinstance(command, GroupMixin):
                     yield from command.walk_commands()
 
-    async def get_context(self, message, *args, cls=Context):
+    async def get_context(self, message, *, cls=Context):
         """Override latter part of context in case we actually run into
         a disambiguation.
         """
-        ctx = await super().get_context(message, *args, cls=Context)
+        ctx = await super().get_context(message, cls=Context)
         # Make sure the current command is not part of a disambiguation with
         # multiple commands.
         if ctx.command is not None:
@@ -322,6 +324,7 @@ class NyxBot(NyxBase, Bot):
                 'Command "{}" is not found'.format(ctx.invoked_with))
             if disambiguation is not None and len(disambiguation) > 1:
                 exc = CommandHasDisambiguation(
+                    disambiguation,
                     'Command "{}" exists in multiple cogs'.format(
                         ctx.invoked_with))
             self.dispatch("command_error", ctx, exc)
