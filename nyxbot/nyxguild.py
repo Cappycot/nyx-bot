@@ -181,6 +181,7 @@ class NyxGuild(Cog):
 
     @commands.command(aliases=["prefixes"])
     @commands.guild_only()
+    @nyxcommands.has_privilege_or_permissions(privilege=-1, manage_server=True)
     async def prefix(self, ctx, action=None, *prefixes):
         """List, add, or remove prefixes from a server."""
         add = False
